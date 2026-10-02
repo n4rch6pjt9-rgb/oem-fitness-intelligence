@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+coverage/
+public/assets/
+supabase/.temp/
+evidence/
+.playwright-mcp/
+*.pfx
+*.p12
+*.pem
+*.key
+*.log
