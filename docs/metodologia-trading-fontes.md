@@ -83,4 +83,3 @@ Não presumir que desembarque em Navegantes define sozinho o tratamento de ICMS.
 ## Validação desta etapa
 
 Teste de maquete pela interface: cadastro demonstrativo, acesso ao catálogo, checkbox HS01, filtro Comercial leve, inclusão de segundo item e revisão. A seleção anterior foi preservada ao filtrar. Coleta, banco, habilitação real e cálculo fiscal não estão integrados; não foram testados end-to-end.
-

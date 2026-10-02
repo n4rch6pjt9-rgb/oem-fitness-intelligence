@@ -108,4 +108,3 @@ Classe de uso da máquina não deve ser campo do cliente. Habilitação não dev
 Percurso pela UI: cliente demonstrativo → habilitação Limitada 150 mil → catálogo → HS01 selecionado → filtro Comercial leve → segundo item selecionado → Por conta e ordem → trading Ilimitada → remuneração percentual com base Mercadoria → FOB/local nomeado → revisão → quantidade HS01 igual a quatro → configuração demonstrativa → Conferir percurso.
 
 Resultado: parâmetros visíveis no resumo, dois itens preservados entre filtros e quantidade/configuração editáveis. Cinco por cento foi entrada fictícia de teste, não preço de mercado. Evidência em `evidence/modelo-ui-revisao.png`. Verificação de sintaxe do script passou. Sem conexão com banco, coleta ou cálculo fiscal; recarregar limpa os dados demonstrativos.
-
