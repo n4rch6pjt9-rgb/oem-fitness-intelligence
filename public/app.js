@@ -39,7 +39,7 @@ async function showDetail(id){
   const extraction=ad.attributes?.extraction;
   const usage=extraction?.usage_classification;
   if(usage){content.append(node('h3','Intenção de uso declarada'),node('p',usage.declared_class==='light_commercial'?'Light commercial · Comercial leve':usage.declared_class==='commercial'?'Commercial · Comercial':usage.conflict?'Classe divergente entre declarações':'Classe de uso não informada'),node('p','Declaração do fornecedor; intensidade de uso não verificada.'));for(const evidence of usage.evidence)content.append(node('p',`${evidence.value} — ${evidence.source_section}`));}
-  const table=node('table');for(const[key,value]of Object.entries(ad.attributes??{})){if(key==='extraction')continue;const row=node('tr');row.append(node('th',key),node('td',value));table.append(row);}content.append(node('h3','Atributos declarados na fonte'),table);$('detail').showModal();
+  const table=node('table');for(const item of [...(p.specifications??[]),...(p.commercial_terms??[])]){const value=displayValue(item.field,String(item.value));if(value===null)continue;const row=node('tr');row.append(node('th',fieldLabel(item.field)),node('td',value));table.append(row);}content.append(table);
 }
 async function refreshQueue(){
   if(!selected)return;const data=await api(`/factories/${selected}/pages?page=${queuePage}`);queueTotal=data.total;$('queue-list').replaceChildren();
@@ -73,7 +73,7 @@ $('assisted-form').onsubmit=e=>{e.preventDefault();run(async()=>{
   if(selected!==factoryId)return;
   assistedToken=data.token;assistedFactory=factoryId;
   const p=data.product,content=$('assisted-data');content.replaceChildren(node('h4',`Modelo: ${p.product.model??'Não informado'}`),node('p',`Linha: ${data.line_name}`));
-  const table=node('table');for(const item of [...(p.specifications??[]),...(p.commercial_terms??[])]){if(!labels[item.field]||!/^[-+0-9.,\\s*x×kgm]+$/i.test(String(item.value)))continue;const row=node('tr');row.append(node('th',labels[item.field]),node('td',item.value));table.append(row);}content.append(table);
+  const table=node('table');for(const item of [...(p.specifications??[]),...(p.commercial_terms??[])]){const value=displayValue(item.field,String(item.value));if(value===null)continue;const row=node('tr');row.append(node('th',fieldLabel(item.field)),node('td',value));table.append(row);}content.append(table);
   const gallery=node('div',undefined,'detail-images');for(const photo of p.images??[])gallery.append(image(photo.url));content.append(gallery,node('p',`${(p.images??[]).length} imagens extraídas. Os valores de cada contexto serão preservados.`));
   $('assisted-preview').hidden=false;$('assisted-save').disabled=false;message('Prévia pronta. Revise a ficha antes de salvar.');
 });};
