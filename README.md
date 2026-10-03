@@ -27,7 +27,7 @@ npm run typecheck
 npm start
 ```
 
-Acesse a origem configurada em `APP_ORIGIN`, por padrão http://localhost:3000. A ficha está em `/example.html`; a navegação proposta, em `/modelo-navegacao.html`.
+Acesse a origem configurada em `APP_ORIGIN`, por padrão http://localhost:3000. O catálogo ligado à API está em `/catalogo.html`; a ficha demonstrativa, em `/example.html`; a navegação proposta, em `/modelo-navegacao.html`. O catálogo exige login de operador e dados coletados no banco; não usa o exemplo como substituto.
 
 Para coleta renderizada, instale o Chromium oficial com `npx playwright install chromium`. O worker fica desligado por padrão. Configure o banco, revise a fila pela interface e só então habilite `CRAWLER_ENABLED`.
 
@@ -52,5 +52,7 @@ Catálogo completo exige cobertura da paginação, revisão das linhas e fila se
 Este é um piloto, sem conclusão do teste integral pela UI. Cadastro, seleção, coleta e simulação devem ser validados na interface antes de declarar o fluxo completo. A maquete de navegação contém dados demonstrativos; habilitação, operação e simulação ainda não têm persistência completa. O simulador logístico/fiscal e as cotações de frete permanecem no planejamento.
 
 O servidor e a fila exigem processo Node persistente. Preparação para produção inclui isolamento por organização, proteção operacional, limites de transporte e validação das integrações reais. Evidências e planilhas privadas permanecem na pasta original e não integram esta publicação.
+
+O levantamento e as dependências estão em [Plano de construção](docs/plano-construcao.md) e no [projeto oem - tasks](https://github.com/users/n4rch6pjt9-rgb/projects/2). A primeira etapa de catálogo implementa API de linhas, filtro antes da paginação e estados de autenticação/erro/vazio. Consolidação, revisão, coleta completa e seleção persistente continuam pendentes.
 
 Contribuições seguem `CONTRIBUTING.md`, com branches `codex/`, commits focados e revisão por PR.
