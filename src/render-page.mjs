@@ -2,9 +2,9 @@ import { chromium } from 'playwright';
 import { canonicalUrl } from './parser.mjs';
 
 // This isolated browser does not reuse operator cookies or Supabase sessions.
-export async function renderPage(url) {
+export async function renderPage(url, _options, browserType=chromium) {
   url=canonicalUrl(url);
-  const browser=await chromium.launch({headless:true});
+  const browser=await browserType.launch({headless:true});
   try {
     const context=await browser.newContext({locale:'en-US'});
     const page=await context.newPage();
@@ -15,7 +15,9 @@ export async function renderPage(url) {
       return route.continue();
     });
     const response=await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
-    if(!response||!response.ok())throw new Error(`Fonte retornou HTTP ${response?.status()??'indisponível'}.`);
+    if(!response)throw new Error('Fonte não retornou uma resposta HTTP.');
+    // Preserve refusal statuses for the queue; do not parse an error page.
+    if(!response.ok())return new Response(null,{status:response.status()});
     const blocked=/captcha|access denied|verify you are human|unusual traffic/i.test(await page.title());
     if(blocked)throw new Error('Coleta bloqueada por desafio ou controle de acesso.');
     if(new URL(url).pathname.startsWith('/product/')) {
