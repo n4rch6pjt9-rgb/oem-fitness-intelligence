@@ -1,3 +1,4 @@
+import {PrintSheetApp} from './print-sheet';
 import {CatalogApp} from './catalog';
 import React,{useState} from 'react';
 import {createRoot} from 'react-dom/client';
@@ -30,5 +31,5 @@ function App({data}:{data:Extraction}){
  <TabsContent value="commercial"><FieldCards records={data.commercial_terms}/></TabsContent></Tabs>
  <footer className="flex flex-wrap items-center justify-between gap-3 py-4"><Badge variant="outline"><Factory data-icon="inline-start"/>BRTW</Badge><Badge variant="outline"><Layers data-icon="inline-start"/>Série HS · 2025</Badge></footer></main></div></div>;
 }
-async function boot(){const root=createRoot(document.getElementById('root')!);if(location.pathname==='/catalogo.html'){root.render(<CatalogApp/>);return;}try{const response=await fetch('/examples/brtw-hs01.json');if(!response.ok)throw new Error('Não foi possível carregar o equipamento.');const data:Extraction=await response.json();root.render(<App data={data}/>);}catch(error){root.render(<p role="alert">{error instanceof Error?error.message:'Equipamento indisponível.'}</p>);}}
+async function boot(){const root=createRoot(document.getElementById('root')!);if(location.pathname==='/ficha.html'){root.render(<PrintSheetApp/>);return;}if(location.pathname==='/catalogo.html'){root.render(<CatalogApp/>);return;}try{const response=await fetch('/examples/brtw-hs01.json');if(!response.ok)throw new Error('Não foi possível carregar o equipamento.');const data:Extraction=await response.json();root.render(<App data={data}/>);}catch(error){root.render(<p role="alert">{error instanceof Error?error.message:'Equipamento indisponível.'}</p>);}}
 void boot();

@@ -217,7 +217,7 @@ function ProductSheet({
           <ChevronLeft data-icon="inline-start" />
           Voltar ao catálogo
         </Button>
-        <Button variant="outline" onClick={() => window.print()}>
+        <Button variant="outline" onClick={() => window.open(`/ficha.html?id=${encodeURIComponent(item.id)}`, "_blank", "noopener,noreferrer")}>
           <Printer data-icon="inline-start" />
           Imprimir ficha
         </Button>
