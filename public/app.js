@@ -39,7 +39,7 @@ async function showDetail(id){
   const extraction=ad.attributes?.extraction;
   const usage=extraction?.usage_classification;
   if(usage){content.append(node('h3','Intenção de uso declarada'),node('p',usage.declared_class==='light_commercial'?'Light commercial · Comercial leve':usage.declared_class==='commercial'?'Commercial · Comercial':usage.conflict?'Classe divergente entre declarações':'Classe de uso não informada'),node('p','Declaração do fornecedor; intensidade de uso não verificada.'));for(const evidence of usage.evidence)content.append(node('p',`${evidence.value} — ${evidence.source_section}`));}
-  const table=node('table');for(const item of [...(p.specifications??[]),...(p.commercial_terms??[])]){const value=displayValue(item.field,String(item.value));if(value===null)continue;const row=node('tr');row.append(node('th',fieldLabel(item.field)),node('td',value));table.append(row);}content.append(table);
+  const table=node('table');for(const[key,value]of Object.entries(ad.attributes??{})){if(key==='extraction')continue;const row=node('tr');row.append(node('th',key),node('td',value));table.append(row);}content.append(node('h3','Atributos declarados na fonte'),table);$('detail').showModal();
 }
 async function refreshQueue(){
   if(!selected)return;const data=await api(`/factories/${selected}/pages?page=${queuePage}`);queueTotal=data.total;$('queue-list').replaceChildren();
