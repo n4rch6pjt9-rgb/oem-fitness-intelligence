@@ -8,6 +8,7 @@ import { createCrawler, unwrap } from './src/crawler.mjs';
 import { registerClientRoutes, InputError } from './src/client-api.mjs';
 import { createSiscomex, registerSiscomexRoutes } from './src/siscomex.mjs';
 import { registerOperatorSetup } from './src/operator-setup.mjs';
+import { registerCatalogRoutes } from './src/catalog-api.mjs';
 
 export function createApp(env=process.env) {
   const app=express();app.disable('x-powered-by');
@@ -77,14 +78,7 @@ export function createApp(env=process.env) {
   app.post('/api/factories/:id/retry',wrap(async(req,res)=>{
     unwrap(await db.from('oem_pages').update({state:'queued',attempts:0,error:null,available_at:new Date().toISOString()}).eq('factory_id',req.params.id).eq('state','error'));res.json({ok:true});
   }));
-  app.get('/api/factories/:id/ads',wrap(async(req,res)=>{
-    const page=Number(req.query.page??1),size=24;
-    if(!Number.isInteger(page)||page<1||page>100000)return res.status(400).json({error:'Página inválida.'});
-    let query=db.from('oem_ads').select('id,title,model,price_min,price_max,currency,moq,images,source_url,dimensions_mm,packing_mm,collected_at',{count:'exact'}).eq('factory_id',req.params.id);
-    if(req.query.q){const q=String(req.query.q).slice(0,120).replace(/[\\%_]/g,x=>'\\'+x);query=query.ilike('title',`%${q}%`);}
-    const result=await query.order('source_url').range((page-1)*size,page*size-1);unwrap(result);
-    res.json({items:result.data,total:result.count,page,size});
-  }));
+  registerCatalogRoutes(app,db,wrap);
   app.get('/api/ads/:id',wrap(async(req,res)=>{
     const ad=unwrap(await db.from('oem_ads').select('*').eq('id',req.params.id).maybeSingle());if(!ad)return res.status(404).json({error:'Anúncio não encontrado.'});
     ad.lines=unwrap(await db.from('oem_ad_lines').select('oem_lines(name,source_url)').eq('ad_id',ad.id));res.json(ad);

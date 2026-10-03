@@ -46,7 +46,8 @@ async function refreshQueue(){
   $('queue-label').textContent=`Página ${queuePage} de ${Math.max(1,Math.ceil(queueTotal/50))}`;$('queue-previous').disabled=queuePage===1;$('queue-next').disabled=queuePage*50>=queueTotal;
 }
 async function run(action){try{await action();}catch(e){message(e.message,true);}}
-async function enter(){if(new URLSearchParams(location.search).get('next')==='clients'){location.assign('/modelo-navegacao.html');return;}loggedIn=true;$('login').hidden=true;$('workspace').hidden=false;$('logout').hidden=false;await refreshFactories();}
+async function enter(){
+  if(new URLSearchParams(window.location.search).get('next')==='catalog'){window.location.assign('/catalogo.html');return;}if(new URLSearchParams(location.search).get('next')==='clients'){location.assign('/modelo-navegacao.html');return;}loggedIn=true;$('login').hidden=true;$('workspace').hidden=false;$('logout').hidden=false;await refreshFactories();}
 $('login-form').onsubmit=e=>{e.preventDefault();run(async()=>{const data=new FormData(e.target);await post('/login',{email:data.get('email'),password:data.get('password')});e.target.reset();message('Acesso autorizado.');await enter();});};
 $('logout').onclick=()=>run(async()=>{await post('/logout',{});loggedIn=false;$('workspace').hidden=true;$('login').hidden=false;$('logout').hidden=true;$('detail').close();message('Você saiu.');});
 $('factory-form').onsubmit=e=>{e.preventDefault();run(async()=>{const data=new FormData(e.target);const f=await post('/factories',{url:data.get('url')});selected=f.id;page=1;$('catalog').hidden=false;await refreshFactories();await refreshAds();message('Fábrica cadastrada e fila preparada. Inicie a coleta quando o worker estiver habilitado.');});};
