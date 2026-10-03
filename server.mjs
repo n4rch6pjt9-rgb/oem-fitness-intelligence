@@ -1,4 +1,5 @@
 import express from 'express';
+import { createAssistedCollection } from './src/assisted-collection.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -25,7 +26,7 @@ export function createApp(env=process.env) {
     res.set({'Content-Security-Policy':"default-src 'self'; img-src 'self' https:; connect-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Cache-Control':'no-store'});
     if(req.method!=='GET'&&req.headers.origin!==origin)return res.status(403).json({error:'Origem não autorizada.'});next();
   });
-  app.use(express.json({limit:'16kb'}));
+  app.use((req,res,next)=>req.path.endsWith('/assisted/preview')?next():express.json({limit:'16kb'})(req,res,next));
   app.use(express.static(fileURLToPath(new URL('./public',import.meta.url))));
   const wrap=handler=>(req,res,next)=>Promise.resolve(handler(req,res,next)).catch(next);
   const cookie=(res,id)=>res.setHeader('Set-Cookie',`oem_session=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${id?28800:0}${secure?'; Secure':''}`);
@@ -78,6 +79,9 @@ export function createApp(env=process.env) {
   app.post('/api/factories/:id/retry',wrap(async(req,res)=>{
     unwrap(await db.from('oem_pages').update({state:'queued',attempts:0,error:null,available_at:new Date().toISOString()}).eq('factory_id',req.params.id).eq('state','error'));res.json({ok:true});
   }));
+  const assisted=db?createAssistedCollection(db,crawler.persistProduct):null;
+  app.post('/api/factories/:id/assisted/preview',express.json({limit:'9mb'}),wrap(async(req,res)=>res.json(await assisted.preview(req.params.id,req.sisSession,req.body))));
+  app.post('/api/factories/:id/assisted/save',wrap(async(req,res)=>res.json(await assisted.save(req.params.id,req.sisSession,req.body.token))));
   registerCatalogRoutes(app,db,wrap);
   app.get('/api/ads/:id',wrap(async(req,res)=>{
     const ad=unwrap(await db.from('oem_ads').select('*').eq('id',req.params.id).maybeSingle());if(!ad)return res.status(404).json({error:'Anúncio não encontrado.'});

@@ -13,6 +13,11 @@ export function createCrawler(db, fetchPage=renderPage) {
     if(ad) for(const line_id of lineIds) unwrap(await db.from('oem_ad_lines').upsert({ad_id:ad.id,line_id},{onConflict:'ad_id,line_id'}));
     return page;
   }
+  async function persistProduct(factoryId, data, lineIds) {
+    const ad=unwrap(await db.from('oem_ads').upsert({...data,factory_id:factoryId},{onConflict:'source_url'}).select('id').single());
+    for(const line_id of lineIds) unwrap(await db.from('oem_ad_lines').upsert({ad_id:ad.id,line_id},{onConflict:'ad_id,line_id'}));
+    return ad;
+  }
   async function step() {
     if(busy) return null; busy=true; let page;
     try {
@@ -29,8 +34,7 @@ export function createCrawler(db, fetchPage=renderPage) {
       const parsed=parsePage(html,target);
       const lineIds=unwrap(await db.from('oem_page_lines').select('line_id').eq('page_id',page.id)).map(x=>x.line_id);
       if(parsed.kind==='product') {
-        const ad=unwrap(await db.from('oem_ads').upsert({...parsed.ad,factory_id:page.factory_id},{onConflict:'source_url'}).select('id').single());
-        for(const line_id of lineIds) unwrap(await db.from('oem_ad_lines').upsert({ad_id:ad.id,line_id},{onConflict:'ad_id,line_id'}));
+        await persistProduct(page.factory_id,parsed.ad,lineIds);
       }else {
         const ownLine=unwrap(await db.from('oem_lines').select('id').eq('source_url',target).maybeSingle());
         if(ownLine&&!lineIds.includes(ownLine.id))lineIds.push(ownLine.id);
@@ -54,5 +58,5 @@ export function createCrawler(db, fetchPage=renderPage) {
       return {id:page.id,state:'error',error:error.message};
     }finally {busy=false;}
   }
-  return {enqueue,step};
+  return {enqueue,step,persistProduct};
 }

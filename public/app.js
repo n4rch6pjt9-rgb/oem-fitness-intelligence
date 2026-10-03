@@ -1,3 +1,4 @@
+import {displayValue,fieldLabel} from '/assets/vocabulary.js';
 const $=id=>document.getElementById(id);
 let selected=null,page=1,query='',total=0,queuePage=1,queueTotal=0,loggedIn=false,factories=[];
 const message=(text,error=false)=>{$('message').textContent=text;$('message').className=error?'error':'';};
@@ -21,7 +22,7 @@ function coverage(f){
 }
 async function refreshFactories(){
   factories=await api('/factories');$('factories').replaceChildren();
-  for(const f of factories){const card=node('article',undefined,'factory'+(selected===f.id?' selected':''));card.append(node('span',f.domain,'eyebrow'),node('h3',f.name),node('p',coverage(f),'metrics'));const b=node('button','Abrir catálogo');b.onclick=()=>run(async()=>{selected=f.id;page=1;queuePage=1;query='';$('catalog').hidden=false;$('queue-results').hidden=true;await refreshFactories();await refreshAds();});card.append(b);$('factories').append(card);}
+  for(const f of factories){const card=node('article',undefined,'factory'+(selected===f.id?' selected':''));card.append(node('span',f.domain,'eyebrow'),node('h3',f.name),node('p',coverage(f),'metrics'));const b=node('button','Abrir catálogo');b.onclick=()=>run(async()=>{selected=f.id;clearAssisted();page=1;queuePage=1;query='';$('catalog').hidden=false;$('queue-results').hidden=true;await refreshFactories();await refreshAds();});card.append(b);$('factories').append(card);}
   if(!factories.length)$('factories').append(node('p','Nenhuma fábrica cadastrada. Cadastre a BRTW para preparar a fila.'));
   const f=factories.find(x=>x.id===selected);if(f){$('factory-name').textContent=f.name;$('coverage').textContent=coverage(f);}
 }
@@ -60,3 +61,25 @@ $('queue-previous').onclick=()=>{queuePage--;run(refreshQueue);};$('queue-next')
 $('close-detail').onclick=()=>$('detail').close();
 setInterval(()=>{if(loggedIn)run(async()=>{await refreshFactories();if(selected)await refreshAds();if(!$('queue-results').hidden)await refreshQueue();});},10000);
 run(async()=>{const health=await api('/health');if(!health.configured){message('Aplicação pronta para configurar: informe o Supabase e os operadores no .env do servidor. A coleta ainda não foi executada.');return;}try{await api('/me');await enter();}catch{message('Entre para acessar o catálogo.');}});
+let assistedToken=null,assistedFactory=null;
+function clearAssisted(){assistedToken=null;assistedFactory=null;$('assisted-save').disabled=true;$('assisted-preview').hidden=true;}
+$('assisted-form').oninput=clearAssisted;
+$('assisted-form').onsubmit=e=>{e.preventDefault();run(async()=>{
+  clearAssisted();if(!selected)throw new Error('Selecione uma fábrica.');
+  const form=new FormData(e.target),file=form.get('html');
+  if(!(file instanceof File)||!file.size||file.size>8000000)throw new Error('Selecione um HTML de até 8 MB.');
+  const factoryId=selected;
+  const data=await post(`/factories/${factoryId}/assisted/preview`,{url:form.get('url'),line_name:form.get('line_name'),line_url:form.get('line_url'),html:await file.text()});
+  if(selected!==factoryId)return;
+  assistedToken=data.token;assistedFactory=factoryId;
+  const p=data.product,content=$('assisted-data');content.replaceChildren(node('h4',`Modelo: ${p.product.model??'Não informado'}`),node('p',`Linha: ${data.line_name}`));
+  const table=node('table');for(const item of [...(p.specifications??[]),...(p.commercial_terms??[])]){if(!labels[item.field]||!/^[-+0-9.,\\s*x×kgm]+$/i.test(String(item.value)))continue;const row=node('tr');row.append(node('th',labels[item.field]),node('td',item.value));table.append(row);}content.append(table);
+  const gallery=node('div',undefined,'detail-images');for(const photo of p.images??[])gallery.append(image(photo.url));content.append(gallery,node('p',`${(p.images??[]).length} imagens extraídas. Os valores de cada contexto serão preservados.`));
+  $('assisted-preview').hidden=false;$('assisted-save').disabled=false;message('Prévia pronta. Revise a ficha antes de salvar.');
+});};
+$('assisted-save').onclick=()=>run(async()=>{
+  if(!assistedToken||assistedFactory!==selected)throw new Error('Gere uma prévia para a fábrica selecionada.');
+  $('assisted-save').disabled=true;
+  try{const saved=await post(`/factories/${selected}/assisted/save`,{token:assistedToken});clearAssisted();await refreshFactories();await refreshAds();message(`Modelo ${saved.model??'Sem identificação'} salvo no catálogo e vinculado à linha.`);}
+  finally{if(assistedToken)$('assisted-save').disabled=false;}
+});
