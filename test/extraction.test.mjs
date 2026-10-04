@@ -71,18 +71,29 @@ test('group listing stays scoped and returns only remaining pages at 48', () => 
   assert.deepEqual(remainingPages(3), []);
 });
 
-test('contextual specifications remain separate and resized photos count once', () => {
+test('conflicting technical claims preserve source blocks without inventing variants', () => {
   const html =
+    '<script type="application/ld+json">' +
+    '{"@type":"Product","name":"Press"}' +
+    '</script>' +
     '<h1>Press</h1>' +
     '<div class="bsc-item">' +
       '<span class="bac-item-label">Specification</span>' +
       '<span class="bac-item-value">1500*1100*1630 mm</span>' +
+    '</div>' +
+    '<div class="bsc-item">' +
+      '<span class="bac-item-label">Weight Stack</span>' +
+      '<span class="bac-item-value">96kg+4.6kg</span>' +
     '</div>' +
     '<div class="detail-desc">' +
       '<table>' +
         '<tr>' +
           '<td>Size</td>' +
           '<td>1040*1450*1630mm</td>' +
+        '</tr>' +
+        '<tr>' +
+          '<td>Weight Stack</td>' +
+          '<td>100kg</td>' +
         '</tr>' +
       '</table>' +
     '</div>' +
@@ -94,22 +105,59 @@ test('contextual specifications remain separate and resized photos count once', 
     origin + '/product/A/Press.html'
   );
 
-  assert.equal(
-    data.contextual_variants[0].field,
-    'dimensions'
+  assert.deepEqual(
+    data.conflicts.find(x => x.field === 'dimensions'),
+    {
+      field: 'dimensions',
+      values: [
+        {
+          value: '1500*1100*1630 mm',
+          source_section: 'Basic Info.'
+        },
+        {
+          value: '1040*1450*1630mm',
+          source_section: 'Product Description / table'
+        }
+      ]
+    }
   );
 
-  assert.equal(
-    data.contextual_variants[0].values.length,
-    2
+  const parsed = parsePage(
+    html,
+    origin + '/product/A/Press.html'
   );
 
-  assert.equal(
-    data.contextual_variants[0].values[0].declared_class,
-    null
+  assert.equal(parsed.kind, 'product');
+  assert.equal(parsed.ad.dimensions_mm, null);
+
+  assert.deepEqual(
+    parsed.ad.attributes.extraction.conflicts.find(
+      x => x.field === 'dimensions'
+    ),
+    data.conflicts.find(
+      x => x.field === 'dimensions'
+    )
   );
 
-  assert.equal(data.conflicts.length, 0);
+  assert.deepEqual(
+    data.conflicts.find(x => x.field === 'weight_stack'),
+    {
+      field: 'weight_stack',
+      values: [
+        {
+          value: '96kg+4.6kg',
+          source_section: 'Basic Info.'
+        },
+        {
+          value: '100kg',
+          source_section: 'Product Description / table'
+        }
+      ]
+    }
+  );
+
+  assert.equal(data.contextual_variants.length, 0);
+
   assert.equal(data.images.length, 1);
   assert.equal(data.product.model, null);
 

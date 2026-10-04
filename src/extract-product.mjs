@@ -56,8 +56,8 @@ export function extractProduct(html, sourceUrl) {
   if(!highlighted.length)result.limitations.push('Product Highlights não identificado nesta captura.');
   result.limitations.push('Certificações e demais alegações são declarações do fornecedor, sem verificação independente.');
   result.usage_classification=classifyUsage(result.product.title,result.specifications);
-  const contextualFields=new Set(['tube_size','weight_stack','dimensions']);
-  result.contextual_variants=result.conflicts.filter(x=>contextualFields.has(x.field)).map(({field,values})=>({field,values:values.map(value=>({...value,declared_class:null})),comparison_status:'contextual_declarations'}));
-  result.conflicts=result.conflicts.filter(x=>!contextualFields.has(x.field));
+  // Conflicting technical claims remain conflicts with their source blocks.
+  // A conflict is evidence of disagreement, not proof of a formal variant.
+  result.contextual_variants=[];
   return result;
 }
