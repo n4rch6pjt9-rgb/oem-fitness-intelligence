@@ -44,6 +44,25 @@ export function createAssistedCollection(db, persistProduct, now = Date.now) {
       if (listing.hostname !== row.domain || listing.pathname !== '/productList') {
         throw new InputError('A listagem deve pertencer à fábrica selecionada.');
       }
+      const $ = load(body.html);
+      const htmlPage = $('[name="pageNumber"]').first().val();
+      const htmlPageSize = $('[name="pageSize"]').first().val();
+      const htmlIsByGroup = $('[name="isByGroup"]').first().val();
+      const htmlGroup = $('[name="productGroupOrCatId"]').first().val();
+
+      const expectedPage = listing.searchParams.get('pageNumber') ?? '1';
+      const expectedPageSize = listing.searchParams.get('pageSize') ?? '48';
+      const expectedIsByGroup = listing.searchParams.get('isByGroup') ?? '';
+      const expectedGroup = listing.searchParams.get('productGroupOrCatId') ?? '';
+
+      if (
+        String(htmlPage ?? '') !== expectedPage ||
+        String(htmlPageSize ?? '') !== expectedPageSize ||
+        String(htmlIsByGroup ?? '') !== expectedIsByGroup ||
+        String(htmlGroup ?? '') !== expectedGroup
+      ) {
+        throw new InputError('O HTML pertence a outra página ou linha da listagem. Confira a URL.');
+      }
 
       let parsed;
       try {
