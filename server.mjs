@@ -1,4 +1,5 @@
 import express from 'express';
+import { createAssistedCollection } from './src/assisted-collection.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +9,7 @@ import { createCrawler, unwrap } from './src/crawler.mjs';
 import { registerClientRoutes, InputError } from './src/client-api.mjs';
 import { createSiscomex, registerSiscomexRoutes } from './src/siscomex.mjs';
 import { registerOperatorSetup } from './src/operator-setup.mjs';
+import { registerCatalogRoutes } from './src/catalog-api.mjs';
 
 export function createApp(env=process.env) {
   const app=express();app.disable('x-powered-by');
@@ -20,11 +22,22 @@ export function createApp(env=process.env) {
   let siscomex=createSiscomex(env);
   const allowed=new Set((env.OEM_OPERATOR_IDS??'').split(',').map(x=>x.trim()).filter(Boolean));
   const origin=env.APP_ORIGIN??'http://localhost:3000';const secure=origin.startsWith('https:');
+  const testAuthBypass =
+    env.TEST_AUTH_BYPASS === 'true' &&
+    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
   app.use((req,res,next)=>{
     res.set({'Content-Security-Policy':"default-src 'self'; img-src 'self' https:; connect-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Cache-Control':'no-store'});
     if(req.method!=='GET'&&req.headers.origin!==origin)return res.status(403).json({error:'Origem não autorizada.'});next();
   });
-  app.use(express.json({limit:'16kb'}));
+app.use((req,res,next)=>{
+  const largeAssistedPreview =
+    req.path.endsWith('/assisted/preview') ||
+    req.path.endsWith('/assisted/listing/preview');
+
+  return largeAssistedPreview
+    ? next()
+    : express.json({limit:'16kb'})(req,res,next);
+});
   app.use(express.static(fileURLToPath(new URL('./public',import.meta.url))));
   const wrap=handler=>(req,res,next)=>Promise.resolve(handler(req,res,next)).catch(next);
   const cookie=(res,id)=>res.setHeader('Set-Cookie',`oem_session=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${id?28800:0}${secure?'; Secure':''}`);
@@ -50,6 +63,11 @@ export function createApp(env=process.env) {
     if(session)await session.auth.auth.signOut({scope:'local'});siscomex.disconnect({sisSession:id});sessions.delete(id);cookie(res,'');res.json({ok:true});
   }));
   app.use('/api',wrap(async(req,res,next)=>{
+    if(testAuthBypass){
+      req.operator={id:'local-test-operator',email:'operator@localhost.test'};
+      req.sisSession='local-test-session';
+      return next();
+    }
     const id=sessionId(req),session=sessions.get(id);
     if(!session||session.expiresAt<Date.now()){sessions.delete(id);return res.status(401).json({error:'Entre com uma conta de operador.'});}
     const {data:s}=await session.auth.auth.getSession();
@@ -77,14 +95,12 @@ export function createApp(env=process.env) {
   app.post('/api/factories/:id/retry',wrap(async(req,res)=>{
     unwrap(await db.from('oem_pages').update({state:'queued',attempts:0,error:null,available_at:new Date().toISOString()}).eq('factory_id',req.params.id).eq('state','error'));res.json({ok:true});
   }));
-  app.get('/api/factories/:id/ads',wrap(async(req,res)=>{
-    const page=Number(req.query.page??1),size=24;
-    if(!Number.isInteger(page)||page<1||page>100000)return res.status(400).json({error:'Página inválida.'});
-    let query=db.from('oem_ads').select('id,title,model,price_min,price_max,currency,moq,images,source_url,dimensions_mm,packing_mm,collected_at',{count:'exact'}).eq('factory_id',req.params.id);
-    if(req.query.q){const q=String(req.query.q).slice(0,120).replace(/[\\%_]/g,x=>'\\'+x);query=query.ilike('title',`%${q}%`);}
-    const result=await query.order('source_url').range((page-1)*size,page*size-1);unwrap(result);
-    res.json({items:result.data,total:result.count,page,size});
-  }));
+  const assisted=db?createAssistedCollection(db,crawler.persistProduct):null;
+  app.post('/api/factories/:id/assisted/listing/preview',express.json({limit:'9mb'}),wrap(async(req,res)=>res.json(await assisted.previewListing(req.params.id,req.sisSession,req.body))));
+  app.post('/api/factories/:id/assisted/listing/save',wrap(async(req,res)=>res.json(await assisted.saveListing(req.params.id,req.sisSession,req.body.token))));
+  app.post('/api/factories/:id/assisted/preview',express.json({limit:'9mb'}),wrap(async(req,res)=>res.json(await assisted.preview(req.params.id,req.sisSession,req.body))));
+  app.post('/api/factories/:id/assisted/save',wrap(async(req,res)=>res.json(await assisted.save(req.params.id,req.sisSession,req.body.token))));
+  registerCatalogRoutes(app,db,wrap);
   app.get('/api/ads/:id',wrap(async(req,res)=>{
     const ad=unwrap(await db.from('oem_ads').select('*').eq('id',req.params.id).maybeSingle());if(!ad)return res.status(404).json({error:'Anúncio não encontrado.'});
     ad.lines=unwrap(await db.from('oem_ad_lines').select('oem_lines(name,source_url)').eq('ad_id',ad.id));res.json(ad);
