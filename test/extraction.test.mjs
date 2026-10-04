@@ -25,40 +25,50 @@ test('48-item identity retains group and page while removing tracking', () => {
   );
 });
 
-test('group listing stays scoped to the selected group and expands all pages at 48', () => {
-  const url = listingUrl(origin, 'ToLazqByEHcs');
+test('group listing stays scoped and returns only remaining pages at 48', () => {
+  const groupId = 'ToLazqByEHcs';
 
-  const result = parsePage(
+  const html =
     '<body>' +
       'Total 118 2025 New HS Series Products' +
       '<a href="/product/A/Press.html">HS01</a>' +
       '<a href="javascript:submitSearchByGroupOrCatId(\'rqPGlSkuZDhO\')">BF</a>' +
-    '</body>',
-    url
-  );
+    '</body>';
 
-  const products = result.links.filter(
-    x => x.kind === 'product'
-  );
+  const remainingPages = page => {
+    const result = parsePage(
+      html,
+      listingUrl(origin, groupId, page)
+    );
 
-  const pages = result.links.filter(
-    x =>
-      x.kind === 'listing' &&
-      new URL(x.url).searchParams.get('productGroupOrCatId') ===
-        'ToLazqByEHcs'
-  );
+    const products = result.links.filter(
+      x => x.kind === 'product'
+    );
 
-  assert.equal(products.length, 1);
+    const pages = result.links
+      .filter(
+        x =>
+          x.kind === 'listing' &&
+          new URL(x.url).searchParams.get('productGroupOrCatId') ===
+            groupId
+      )
+      .map(x =>
+        Number(
+          new URL(x.url).searchParams.get('pageNumber')
+        )
+      )
+      .sort((a, b) => a - b);
 
-  // 118 produtos / 48 = 3 páginas totais.
-  // A página 1 já está sendo processada, então restam 2 e 3.
-  assert.equal(pages.length, 2);
+    assert.equal(products.length, 1);
+    assert.equal(result.groups.length, 0);
+    assert.equal(result.expectedAds, 118);
 
-  // BF está no menu da fábrica, mas não pertence ao escopo HS.
-  assert.equal(result.groups.length, 0);
+    return pages;
+  };
 
-  // A fonte declarou 118 produtos para esta linha.
-  assert.equal(result.expectedAds, 118);
+  assert.deepEqual(remainingPages(1), [2, 3]);
+  assert.deepEqual(remainingPages(2), [3]);
+  assert.deepEqual(remainingPages(3), []);
 });
 
 test('contextual specifications remain separate and resized photos count once', () => {

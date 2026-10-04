@@ -291,6 +291,15 @@ export function parsePage(html, url) {
       )
     : '';
 
+ const currentPage = fixed48
+  ? Math.max(
+      1,
+      Number(
+        source.searchParams.get('pageNumber') ?? 1
+      )
+    )
+  : 1;
+
   /*
    * O Total pertence à listagem que está sendo processada.
    *
@@ -412,22 +421,33 @@ export function parsePage(html, url) {
      * do MESMO productGroupOrCatId podem pertencer ao
      * escopo atual.
      */
-    if (path === '/productList') {
-      const targetUrl = new URL(target);
+ if (path === '/productList') {
+  const targetUrl = new URL(target);
 
-      if (isGroupListing) {
-        const targetGroup =
-          targetUrl.searchParams.get(
-            'productGroupOrCatId'
-          );
+  if (isGroupListing) {
+    const targetGroup =
+      targetUrl.searchParams.get(
+        'productGroupOrCatId'
+      );
 
-        if (targetGroup !== currentGroupId) {
-          return;
-        }
-      }
-
-      urls.set(target, 'listing');
+    if (targetGroup !== currentGroupId) {
+      return;
     }
+  }
+
+  const targetPage = Math.max(
+    1,
+    Number(
+      targetUrl.searchParams.get('pageNumber') ?? 1
+    )
+  );
+
+  if (targetPage <= currentPage) {
+    return;
+  }
+
+  urls.set(target, 'listing');
+}
   });
 
   /*
@@ -449,7 +469,7 @@ export function parsePage(html, url) {
       );
     }
 
-    for (let n = 1; n <= count; n++) {
+    for (let n = currentPage + 1; n <= count; n++) {
       urls.set(
         listingUrl(
           origin,
