@@ -82,6 +82,33 @@ interface Page {
   page: number;
   size: number;
 }
+
+interface ListingLink {
+  url: string;
+  kind: "product" | "listing";
+}
+
+interface ListingGroup {
+  name: string;
+  source_url: string;
+}
+
+interface ListingPreview {
+  token: string;
+  url: string;
+  groups: ListingGroup[];
+  products: ListingLink[];
+  pages: ListingLink[];
+  expected_ads: number | null;
+  factory_name: string | null;
+}
+
+interface ListingSaved {
+  lines: Line[];
+  products: ListingLink[];
+  pages: ListingLink[];
+  expected_ads: number | null;
+}
 class ApiError extends Error {
   constructor(
     message: string,
@@ -101,6 +128,26 @@ async function api<T>(path: string, signal?: AbortSignal): Promise<T> {
       typeof data.error === "string"
         ? data.error
         : "Consulta indisponível.";
+    throw new ApiError(message, response.status);
+  }
+  return data as T;
+}
+
+async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch("/api" + path, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(body),
+  });
+  const data: unknown = await response.json();
+  if (!response.ok) {
+    const message =
+      typeof data === "object" &&
+      data !== null &&
+      "error" in data &&
+      typeof data.error === "string"
+        ? data.error
+        : "Operação indisponível.";
     throw new ApiError(message, response.status);
   }
   return data as T;
@@ -386,6 +433,12 @@ export function CatalogApp() {
   const [error, setError] = useState("");
   const [unauthorized, setUnauthorized] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [captureUrl, setCaptureUrl] = useState("");
+  const [captureHtml, setCaptureHtml] = useState("");
+  const [capturePreview, setCapturePreview] = useState<ListingPreview | null>(null);
+  const [captureBusy, setCaptureBusy] = useState(false);
+  const [captureError, setCaptureError] = useState("");
+  const [captureSaved, setCaptureSaved] = useState<ListingSaved | null>(null);
   const detailRequest = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
@@ -470,6 +523,48 @@ export function CatalogApp() {
       setLoading(false);
     }
   }
+  async function previewListingCapture() {
+    if (!factory || !captureUrl.trim() || !captureHtml.trim()) return;
+    setCaptureBusy(true);
+    setCaptureError("");
+    setCaptureSaved(null);
+    try {
+      const result = await apiPost<ListingPreview>(
+        `/factories/${factory}/assisted/listing/preview`,
+        {url: captureUrl.trim(), html: captureHtml},
+      );
+      setCapturePreview(result);
+    } catch (error) {
+      setCapturePreview(null);
+      setCaptureError(
+        error instanceof Error ? error.message : "Não foi possível analisar a página.",
+      );
+    } finally {
+      setCaptureBusy(false);
+    }
+  }
+
+  async function saveListingCapture() {
+    if (!factory || !capturePreview) return;
+    setCaptureBusy(true);
+    setCaptureError("");
+    try {
+      const result = await apiPost<ListingSaved>(
+        `/factories/${factory}/assisted/listing/save`,
+        {token: capturePreview.token},
+      );
+      setCaptureSaved(result);
+      setCapturePreview(null);
+      setRevision((value) => value + 1);
+    } catch (error) {
+      setCaptureError(
+        error instanceof Error ? error.message : "Não foi possível confirmar a descoberta.",
+      );
+    } finally {
+      setCaptureBusy(false);
+    }
+  }
+
   const currentFactory = factories.find((record) => record.id === factory);
   const pages = data ? Math.max(1, Math.ceil(data.total / data.size)) : 1;
   return (
@@ -563,6 +658,11 @@ export function CatalogApp() {
                             setPage(1);
                             setQuery("");
                             setSearch("");
+                            setCaptureUrl("");
+                            setCaptureHtml("");
+                            setCapturePreview(null);
+                            setCaptureSaved(null);
+                            setCaptureError("");
                           }}
                         >
                           {!factories.length && (
@@ -620,6 +720,138 @@ export function CatalogApp() {
                     </form>
                   </CardContent>
                 </Card>
+                {factory && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Coleta assistida da listagem</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-4">
+                      <p className="text-sm text-muted-foreground">
+                        Cole a URL e o HTML capturado no navegador. A prévia não grava dados.
+                      </p>
+
+                      <label className="flex flex-col gap-2" htmlFor="listing-url">
+                        URL da listagem
+                        <input
+                          id="listing-url"
+                          className="rounded-md border bg-background p-2"
+                          type="url"
+                          value={captureUrl}
+                          onChange={(event) => {
+                            setCaptureUrl(event.target.value);
+                            setCapturePreview(null);
+                            setCaptureSaved(null);
+                          }}
+                          placeholder="https://...made-in-china.com/productList?..."
+                        />
+                      </label>
+
+                      <label className="flex flex-col gap-2" htmlFor="listing-html">
+                        HTML capturado
+                        <textarea
+                          id="listing-html"
+                          className="min-h-48 rounded-md border bg-background p-3 font-mono text-xs"
+                          value={captureHtml}
+                          onChange={(event) => {
+                            setCaptureHtml(event.target.value);
+                            setCapturePreview(null);
+                            setCaptureSaved(null);
+                          }}
+                          placeholder="Cole aqui o HTML completo da página."
+                        />
+                      </label>
+
+                      {captureError && <p role="alert">{captureError}</p>}
+
+                      <div>
+                        <Button
+                          type="button"
+                          disabled={
+                            captureBusy ||
+                            !captureUrl.trim() ||
+                            !captureHtml.trim()
+                          }
+                          onClick={() => void previewListingCapture()}
+                        >
+                          {captureBusy ? "Analisando…" : "Analisar página"}
+                        </Button>
+                      </div>
+
+                      {capturePreview && (
+                        <div className="flex flex-col gap-4 rounded-lg border p-4">
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="secondary">
+                              {capturePreview.expected_ads === null
+                                ? "Cobertura não informada"
+                                : `${capturePreview.expected_ads} produtos declarados`}
+                            </Badge>
+                            <Badge variant="outline">
+                              {capturePreview.groups.length} linhas encontradas
+                            </Badge>
+                            <Badge variant="outline">
+                              {capturePreview.products.length} produtos nesta página
+                            </Badge>
+                            <Badge variant="outline">
+                              {capturePreview.pages.length} páginas restantes
+                            </Badge>
+                          </div>
+
+                          {capturePreview.groups.length > 0 && (
+                            <div>
+                              <p className="mb-2 font-semibold">Linhas</p>
+                              <div className="flex flex-wrap gap-2">
+                                {capturePreview.groups.map((group) => (
+                                  <Badge key={group.source_url} variant="outline">
+                                    {group.name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {capturePreview.products.length > 0 && (
+                            <div>
+                              <p className="mb-2 font-semibold">Produtos encontrados</p>
+                              <ul className="space-y-2 text-sm">
+                                {capturePreview.products.slice(0, 10).map((product) => (
+                                  <li key={product.url} className="break-all">
+                                    {product.url}
+                                  </li>
+                                ))}
+                              </ul>
+                              {capturePreview.products.length > 10 && (
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                  + {capturePreview.products.length - 10} produtos
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          <div>
+                            <Button
+                              type="button"
+                              disabled={captureBusy}
+                              onClick={() => void saveListingCapture()}
+                            >
+                              {captureBusy
+                                ? "Confirmando…"
+                                : "Confirmar descoberta"}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {captureSaved && (
+                        <p role="status" className="text-sm">
+                          Descoberta confirmada: {captureSaved.lines.length} linhas,{" "}
+                          {captureSaved.products.length} produtos e{" "}
+                          {captureSaved.pages.length} páginas restantes identificadas.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
                 {loading && (
                   <p role="status" aria-live="polite">
                     Carregando catálogo…

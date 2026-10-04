@@ -22,11 +22,22 @@ export function createApp(env=process.env) {
   let siscomex=createSiscomex(env);
   const allowed=new Set((env.OEM_OPERATOR_IDS??'').split(',').map(x=>x.trim()).filter(Boolean));
   const origin=env.APP_ORIGIN??'http://localhost:3000';const secure=origin.startsWith('https:');
+  const testAuthBypass =
+    env.TEST_AUTH_BYPASS === 'true' &&
+    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
   app.use((req,res,next)=>{
     res.set({'Content-Security-Policy':"default-src 'self'; img-src 'self' https:; connect-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Cache-Control':'no-store'});
     if(req.method!=='GET'&&req.headers.origin!==origin)return res.status(403).json({error:'Origem não autorizada.'});next();
   });
-  app.use((req,res,next)=>req.path.endsWith('/assisted/preview')?next():express.json({limit:'16kb'})(req,res,next));
+app.use((req,res,next)=>{
+  const largeAssistedPreview =
+    req.path.endsWith('/assisted/preview') ||
+    req.path.endsWith('/assisted/listing/preview');
+
+  return largeAssistedPreview
+    ? next()
+    : express.json({limit:'16kb'})(req,res,next);
+});
   app.use(express.static(fileURLToPath(new URL('./public',import.meta.url))));
   const wrap=handler=>(req,res,next)=>Promise.resolve(handler(req,res,next)).catch(next);
   const cookie=(res,id)=>res.setHeader('Set-Cookie',`oem_session=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${id?28800:0}${secure?'; Secure':''}`);
@@ -52,6 +63,11 @@ export function createApp(env=process.env) {
     if(session)await session.auth.auth.signOut({scope:'local'});siscomex.disconnect({sisSession:id});sessions.delete(id);cookie(res,'');res.json({ok:true});
   }));
   app.use('/api',wrap(async(req,res,next)=>{
+    if(testAuthBypass){
+      req.operator={id:'local-test-operator',email:'operator@localhost.test'};
+      req.sisSession='local-test-session';
+      return next();
+    }
     const id=sessionId(req),session=sessions.get(id);
     if(!session||session.expiresAt<Date.now()){sessions.delete(id);return res.status(401).json({error:'Entre com uma conta de operador.'});}
     const {data:s}=await session.auth.auth.getSession();
@@ -80,6 +96,8 @@ export function createApp(env=process.env) {
     unwrap(await db.from('oem_pages').update({state:'queued',attempts:0,error:null,available_at:new Date().toISOString()}).eq('factory_id',req.params.id).eq('state','error'));res.json({ok:true});
   }));
   const assisted=db?createAssistedCollection(db,crawler.persistProduct):null;
+  app.post('/api/factories/:id/assisted/listing/preview',express.json({limit:'9mb'}),wrap(async(req,res)=>res.json(await assisted.previewListing(req.params.id,req.sisSession,req.body))));
+  app.post('/api/factories/:id/assisted/listing/save',wrap(async(req,res)=>res.json(await assisted.saveListing(req.params.id,req.sisSession,req.body.token))));
   app.post('/api/factories/:id/assisted/preview',express.json({limit:'9mb'}),wrap(async(req,res)=>res.json(await assisted.preview(req.params.id,req.sisSession,req.body))));
   app.post('/api/factories/:id/assisted/save',wrap(async(req,res)=>res.json(await assisted.save(req.params.id,req.sisSession,req.body.token))));
   registerCatalogRoutes(app,db,wrap);

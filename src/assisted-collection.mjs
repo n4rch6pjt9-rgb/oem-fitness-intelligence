@@ -15,6 +15,155 @@ export function createAssistedCollection(db, persistProduct, now = Date.now) {
     return row;
   }
   return {
+    async previewListing(factoryId, session, body) {
+      prune();
+
+      if (
+        !body ||
+        typeof body.html !== 'string' ||
+        Buffer.byteLength(body.html) > 8_000_000 ||
+        !body.html.trim()
+      ) {
+        throw new InputError('Selecione um HTML de até 8 MB.');
+      }
+
+      if (typeof body.url !== 'string') {
+        throw new InputError('Informe a URL da listagem.');
+      }
+
+      let url;
+      try {
+        url = canonicalUrl(body.url);
+      } catch {
+        throw new InputError('Use uma URL válida da loja Made-in-China.');
+      }
+
+      const row = await factory(factoryId);
+      const listing = new URL(url);
+
+      if (listing.hostname !== row.domain || listing.pathname !== '/productList') {
+        throw new InputError('A listagem deve pertencer à fábrica selecionada.');
+      }
+
+      let parsed;
+      try {
+        parsed = parsePage(body.html, url);
+      } catch (error) {
+        throw new InputError(error.message);
+      }
+
+      if (parsed.kind !== 'listing') {
+        throw new InputError('Selecione uma página de listagem.');
+      }
+
+      for (const [key, value] of pending) {
+        if (value.session === session) pending.delete(key);
+      }
+
+      const token = randomBytes(24).toString('hex');
+      const products = parsed.links.filter(link => link.kind === 'product');
+      const pages = parsed.links.filter(link => link.kind === 'listing');
+
+      pending.set(token, {
+        session,
+        factoryId,
+        type: 'listing',
+        url,
+        parsed,
+        expires: now() + 600000,
+        saving: false
+      });
+
+      return {
+        token,
+        url,
+        groups: parsed.groups,
+        products,
+        pages,
+        expected_ads: parsed.expectedAds,
+        factory_name: parsed.factoryName
+      };
+    },
+
+    async saveListing(factoryId, session, token) {
+      prune();
+
+      const preview =
+        typeof token === 'string' ? pending.get(token) : null;
+
+      if (
+        !preview ||
+        preview.type !== 'listing' ||
+        preview.session !== session ||
+        preview.factoryId !== factoryId
+      ) {
+        throw new InputError(
+          'Prévia expirada ou inválida. Gere uma nova prévia.',
+          409
+        );
+      }
+
+      if (preview.saving) {
+        throw new InputError('A gravação está em andamento.', 409);
+      }
+
+      await factory(factoryId);
+      preview.saving = true;
+
+      try {
+        const lines = [];
+
+        for (const group of preview.parsed.groups) {
+          const line = unwrap(
+            await db
+              .from('oem_lines')
+              .upsert(
+                {...group, factory_id: factoryId},
+                {onConflict:'source_url'}
+              )
+              .select('id')
+              .single()
+          );
+
+          lines.push({
+            id: line.id,
+            name: group.name,
+            source_url: group.source_url
+          });
+        }
+
+        if (preview.parsed.expectedAds !== null) {
+          unwrap(
+            await db
+              .from('oem_factories')
+              .update({
+                expected_ads: preview.parsed.expectedAds,
+                checked_at: new Date().toISOString(),
+                ...(preview.parsed.factoryName
+                  ? {name: preview.parsed.factoryName}
+                  : {})
+              })
+              .eq('id', factoryId)
+          );
+        }
+
+        pending.delete(token);
+
+        return {
+          lines,
+          products: preview.parsed.links.filter(
+            link => link.kind === 'product'
+          ),
+          pages: preview.parsed.links.filter(
+            link => link.kind === 'listing'
+          ),
+          expected_ads: preview.parsed.expectedAds
+        };
+      } finally {
+        preview.saving = false;
+      }
+    },
+
     async preview(factoryId, session, body) {
       prune();
       if (!body || typeof body.html !== 'string' || Buffer.byteLength(body.html) > 8_000_000 || !body.html.trim()) throw new InputError('Selecione um HTML de até 8 MB.');
