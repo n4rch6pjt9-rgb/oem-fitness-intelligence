@@ -18,7 +18,7 @@ test('listing assistida: preview nao grava e save persiste linhas e cobertura', 
   const db = createClient('https://test.invalid', 'key', {
     global: {
       fetch: async (input, options) => {
-        const url = new URL(input);
+       const url = new URL(input);
         const table = url.pathname.split('/').at(-1);
 
         if (options.method === 'GET' && table === 'oem_factories') {
@@ -59,6 +59,10 @@ test('listing assistida: preview nao grava e save persiste linhas e cobertura', 
     <html>
       <head><title>BRTW Fitness</title></head>
       <body>
+        <input name="pageNumber" value="1">
+        <input name="pageSize" value="48">
+        <input name="isByGroup" value="0">
+        <input name="productGroupOrCatId" value="">
         <div>Total 96 Products</div>
         <a href="/product-group/A/HS-Series-1.html">HS Series</a>
         <a href="/product/abc/China-Machine.html">Machine</a>
@@ -124,6 +128,10 @@ test('listing assistida: recusa outra fabrica e token de outra sessao', async ()
 
   const html = `
     <html><body>
+      <input name="pageNumber" value="1">
+      <input name="pageSize" value="48">
+      <input name="isByGroup" value="0">
+      <input name="productGroupOrCatId" value="">
       <div>Total 1 Products</div>
       <a href="/product/abc/China-Machine.html">Machine</a>
     </body></html>`;
@@ -178,12 +186,16 @@ test('listing assistida: exige coleta automatica pausada e respeita expiracao', 
     () => time
   );
 
-  const url =
+ const url =
     `https://${domain}/productList?` +
     'isByGroup=0&pageNumber=1&pageSize=48&viewPageSize=48';
 
   const html = `
     <html><body>
+      <input name="pageNumber" value="1">
+      <input name="pageSize" value="48">
+      <input name="isByGroup" value="0">
+      <input name="productGroupOrCatId" value="">
       <div>Total 1 Products</div>
       <a href="/product/abc/China-Machine.html">Machine</a>
     </body></html>`;
@@ -206,5 +218,89 @@ test('listing assistida: exige coleta automatica pausada e respeita expiracao', 
   await assert.rejects(
     api.saveListing('f', 's', preview.token),
     error => error.status === 409
+  );
+});
+
+test('listing assistida: valida coerencia entre pagina, grupo e HTML', async () => {
+  const db = createClient('https://test.invalid', 'key', {
+    global: {
+      fetch: async (input, options) => {
+        const table = new URL(input).pathname.split('/').at(-1);
+
+        if (options.method === 'GET' && table === 'oem_factories') {
+          return Response.json([{
+            id: 'f',
+            domain,
+            crawl_enabled: false
+          }]);
+        }
+
+        throw new Error('Unexpected database write');
+      }
+    }
+  });
+
+  const api = createAssistedCollection(db, async () => {
+    throw new Error('persistProduct must not run');
+  });
+
+  const listingUrl = page =>
+    `https://${domain}/productList?` +
+    `isByGroup=1&productGroupOrCatId=HS&pageNumber=${page}` +
+    '&pageSize=48&viewPageSize=48';
+
+  const listingHtml = (page, group = 'HS') => `
+    <html>
+      <body>
+        <input name="pageNumber" value="${page}">
+        <input name="pageSize" value="48">
+        <input name="isByGroup" value="1">
+        <input name="productGroupOrCatId" value="${group}">
+        <div>Total 118 Products</div>
+        <a href="/product/abc/China-Machine.html">Machine</a>
+      </body>
+    </html>`;
+
+  const page3 = await api.previewListing(
+    'f',
+    'page-3',
+    {
+      url: listingUrl(3),
+      html: listingHtml(3)
+    }
+  );
+
+  assert.equal(page3.expected_ads, 118);
+
+  await assert.rejects(
+    api.previewListing(
+      'f',
+      'wrong-page',
+      {
+        url: listingUrl(3),
+        html: listingHtml(2)
+      }
+    ),
+    error =>
+      error.status === 400 &&
+      error.message.includes(
+        'outra página ou linha da listagem'
+      )
+  );
+
+  await assert.rejects(
+    api.previewListing(
+      'f',
+      'wrong-group',
+      {
+        url: listingUrl(2),
+        html: listingHtml(2, 'OTHER')
+      }
+    ),
+    error =>
+      error.status === 400 &&
+      error.message.includes(
+        'outra página ou linha da listagem'
+      )
   );
 });

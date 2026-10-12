@@ -228,7 +228,7 @@ export function parsePage(html, url) {
           : attr('MOQ', 'Min. Order'),
 
         dimensions_mm:
-          extraction.contextual_variants.some(
+          extraction.conflicts.some(
             x => x.field === 'dimensions'
           )
             ? null
