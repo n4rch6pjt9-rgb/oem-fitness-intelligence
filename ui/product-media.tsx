@@ -12,7 +12,9 @@ export interface ProductMedia {
 const categories = [
   ["photo","Foto do equipamento"], ["dimensions","Imagem das medidas"],
   ["construction","Detalhes de construção"], ["colors","Cores"],
-  ["accessories","Acessórios"], ["video","Vídeo de demonstração"],
+  ["accessories","Acessórios"], ["details","Detalhes da máquina"],
+  ["description","Descrição do produto"], ["delivery","Despacho do produto"],
+  ["video","Vídeo de demonstração"],
 ];
 
 export function MediaUpload({adId}: {adId: string}) {
