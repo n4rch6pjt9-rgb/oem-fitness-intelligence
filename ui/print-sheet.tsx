@@ -20,7 +20,16 @@ interface Conflict {
   values: Evidence[];
 }
 
+interface ProductMedia {
+  id: string;
+  category: string;
+  caption: string;
+  mime_type: string;
+  url: string;
+}
+
 interface Product {
+  media?: ProductMedia[];
   id: string;
   factory_id: string;
   model: string | null;
@@ -190,6 +199,9 @@ export function PrintSheetApp() {
           );
         }
 
+        const mediaResponse = await fetch('/api/ads/' + id + '/media', {signal:controller.signal});
+        if (!mediaResponse.ok) throw new Error('Não foi possível carregar as mídias da ficha.');
+        item.media = await mediaResponse.json() as ProductMedia[];
         setProduct(item);
       })
       .catch((reason: unknown) => {
@@ -312,6 +324,22 @@ export function PrintSheetApp() {
   const terms = rows(extraction.commercial_terms ?? []);
   const usage = extraction.usage_classification;
 
+  const imageMedia = (product.media ?? []).filter(item => item.mime_type.startsWith('image/'));
+  const uploadedPhotos = imageMedia.filter(item => item.category === 'photo');
+  const gallery = [
+    ...(uploadedPhotos.length ? uploadedPhotos : photos.map((url,index) => ({
+      id:url, url, caption:'Foto ' + (index + 1), category:'photo', mime_type:'image/jpeg',
+    }))),
+    ...imageMedia.filter(item => item.category !== 'photo'),
+  ];
+  const mediaPages: typeof gallery[] = [];
+  for (let index = 0; index < gallery.length; index += 2) mediaPages.push(gallery.slice(index,index + 2));
+  const videos = (product.media ?? []).filter(item => item.category === 'video');
+  if (!mediaPages.length && videos.length) mediaPages.push([]);
+  const totalPages = 2 + mediaPages.length;
+
+
+
   const header = (section: string) => (
     <header className="sheet-header">
       <div>
@@ -330,7 +358,7 @@ export function PrintSheetApp() {
         {product.model ?? 'Modelo não informado'}
       </span>
 
-      <span>Página {page} de 2</span>
+      <span>Página {page} de {totalPages}</span>
     </footer>
   );
 
@@ -393,34 +421,6 @@ export function PrintSheetApp() {
           </p>
         </div>
 
-        <div className="sheet-photos">
-          {photos.map((url, index) => (
-            <figure key={url}>
-              {failedPhotos.includes(url) ? (
-                <p>Imagem indisponível</p>
-              ) : (
-                <img
-                  className="sheet-photo"
-                  src={url}
-                  alt={`${name} - Foto ${index + 1}`}
-                />
-              )}
-
-              <figcaption>Foto {index + 1}</figcaption>
-            </figure>
-          ))}
-        </div>
-
-        {photos.length < 2 && (
-          <p className="sheet-note">
-            {photos.length === 0
-              ? 'Nenhuma foto disponível.'
-              : 'Somente uma foto disponível.'}
-          </p>
-        )}
-
-
-
         <section>
           <h2>Especificações do equipamento</h2>
 
@@ -437,11 +437,31 @@ export function PrintSheetApp() {
         {footer(1)}
       </article>
 
+      {mediaPages.map((images,index) => (
+        <article key={'media-' + index} className="sheet-page" aria-label="Imagens do equipamento">
+          {header(String(index + 2).padStart(2,'0') + ' / Imagens do equipamento')}
+          <div className="sheet-identity"><h1>{name}</h1><p>Modelo {product.model ?? 'Não informado'}</p></div>
+          {images.map(image => (
+            <figure key={image.id}>
+              {failedPhotos.includes(image.url) ? <p>Imagem indisponível</p> : (
+                <img className="sheet-photo" src={image.url} alt={image.caption}
+                  style={{width:'100%',height:'85mm',objectFit:'contain'}} />
+              )}
+              <figcaption>{image.caption}</figcaption>
+            </figure>
+          ))}
+          {index === 0 && videos.map(video => (
+            <p key={video.id}><a href={video.url} target="_blank" rel="noopener noreferrer">Abrir vídeo: {video.caption}</a></p>
+          ))}
+          {footer(index + 2)}
+        </article>
+      ))}
+
       <article
         className="sheet-page"
         aria-label="Condições comerciais para impressão"
       >
-        {header('02 / Condições comerciais')}
+        {header(String(totalPages).padStart(2,'0') + ' / Condições comerciais')}
 
         <div className="sheet-identity">
           <h1>{name}</h1>
@@ -474,7 +494,7 @@ export function PrintSheetApp() {
 
         <p className="sheet-note">Os valores foram preservados por contexto. Informações ausentes permanecem não informadas.</p>
 
-        {footer(2)}
+        {footer(totalPages)}
       </article>
     </main>
   );

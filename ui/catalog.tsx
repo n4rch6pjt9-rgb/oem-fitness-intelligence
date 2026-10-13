@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { MediaUpload } from "./product-media";
 import {
   Factory,
   Layers,
@@ -352,6 +353,7 @@ function ProductSheet({
           </CardContent>
         </Card>
       </div>
+      <MediaUpload adId={item.id} />
       {!extraction ? (
         <Card>
           <CardHeader>
