@@ -333,7 +333,16 @@ export function PrintSheetApp() {
     ...imageMedia.filter(item => item.category !== 'photo'),
   ];
   const mediaPages: typeof gallery[] = [];
-  for (let index = 0; index < gallery.length; index += 2) mediaPages.push(gallery.slice(index,index + 2));
+  const mediaTitles: Record<string,string> = {
+    photo:'Fotos do equipamento', dimensions:'Medidas do equipamento',
+    construction:'Construção', colors:'Cores', accessories:'Acessórios',
+    details:'Detalhes da máquina', description:'Descrição do produto',
+    delivery:'Despacho do produto',
+  };
+  for (const category of Object.keys(mediaTitles)) {
+    const items = gallery.filter(image => image.category === category);
+    for (let index = 0; index < items.length; index += 2) mediaPages.push(items.slice(index,index + 2));
+  }
   const videos = (product.media ?? []).filter(item => item.category === 'video');
   const videoPages: ProductMedia[][] = [];
   for (let index = 0; index < videos.length; index += 8) videoPages.push(videos.slice(index,index + 8));
@@ -440,8 +449,9 @@ export function PrintSheetApp() {
 
       {mediaPages.map((images,index) => (
         <article key={'media-' + index} className="sheet-page" aria-label="Imagens do equipamento">
-          {header(String(index + 2).padStart(2,'0') + ' / Imagens do equipamento')}
+          {header(String(index + 2).padStart(2,'0') + ' / ' + (mediaTitles[images[0]?.category] ?? 'Imagens do equipamento'))}
           <div className="sheet-identity"><h1>{name}</h1><p>Modelo {product.model ?? 'Não informado'}</p></div>
+          {images[0]?.category === 'delivery' && <p className="sheet-note">Imagens da operação de embalagem e despacho apresentadas pelo fabricante.</p>}
           {images.map(image => (
             <figure key={image.id}>
               {failedPhotos.includes(image.url) ? <p>Imagem indisponível</p> : (
