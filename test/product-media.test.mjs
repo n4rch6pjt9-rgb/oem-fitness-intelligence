@@ -33,7 +33,7 @@ test('removes uploaded object when metadata persistence fails', async t => {
       async remove(paths){removed.push(...paths);return {data:[],error:null};},
     };}},
     from(table){
-      if(table==='oem_ads')return {select(){return this;},eq(){return this;},async maybeSingle(){return {data:{id:'ad',factory_id:'factory'},error:null};}};
+      if(table==='oem_ads')return {select(){return this;},eq(){return this;},is(){return this;},async maybeSingle(){return {data:{id:'ad',factory_id:'factory'},error:null};}};
       return {insert(){return this;},select(){return this;},async single(){return {data:null,error:new Error('Persistence failed')};}};
     },
   };

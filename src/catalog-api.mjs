@@ -33,6 +33,8 @@ export function createCatalogApi(db) {
       }
       let query = db.from('oem_ads').select(columns + (lineId !== undefined ? ',oem_ad_lines!inner(line_id)' : ''), { count: 'exact' }).eq('factory_id', factoryId);
       if (lineId !== undefined) query = query.eq('oem_ad_lines.line_id', lineId);
+      if (input.deleted !== undefined && !['true','false'].includes(input.deleted)) throw new InputError('Filtro de exclusão inválido.');
+      query=input.deleted==='true'?query.not('deleted_at','is',null):query.is('deleted_at',null);
       if (q) query = query.ilike('title', `%${q.replace(/[\\%_]/g, character => '\\' + character)}%`);
       const result = await query.order('source_url').order('id').range((page - 1) * size, page * size - 1);
       const items = unwrap(result).map(({ oem_ad_lines: _association, ...item }) => item);

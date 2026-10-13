@@ -30,8 +30,10 @@ export function mediaUploader(operatorId, testOperatorId) {
 export function registerMediaRoutes(app, db, wrap, {testOperatorId = null} = {}) {
   const withUrl = row => ({...row, url: db.storage.from(bucket).getPublicUrl(row.object_path).data.publicUrl});
   app.get('/api/ads/:id/media', wrap(async(req,res) => {
-    const rows = unwrap(await db.from('oem_product_media').select('id,category,caption,object_path,mime_type,byte_size,created_at')
-      .eq('ad_id',req.params.id).order('created_at').order('id'));
+    let query = db.from('oem_product_media').select('id,category,caption,object_path,mime_type,byte_size,created_at')
+      .eq('ad_id',req.params.id);
+    query=req.query.deleted==='true'?query.not('deleted_at','is',null):query.is('deleted_at',null);
+    const rows=unwrap(await query.order('created_at').order('id'));
     res.json(rows.map(withUrl));
   }));
   // Limit concurrent buffered uploads across this server.
@@ -49,7 +51,7 @@ export function registerMediaRoutes(app, db, wrap, {testOperatorId = null} = {})
     if (!caption || caption.length > 160) throw new InputError('Informe uma legenda com até 160 caracteres.',400);
     const mime = (req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();
     validateMedia(req.body,mime,category);
-    const ad = unwrap(await db.from('oem_ads').select('id,factory_id').eq('id',req.params.id).maybeSingle());
+    const ad = unwrap(await db.from('oem_ads').select('id,factory_id').eq('id',req.params.id).is('deleted_at',null).maybeSingle());
     if (!ad) throw new InputError('Produto não encontrado.',404);
     const uploadedBy = mediaUploader(req.operator.id,testOperatorId);
     const id = randomUUID();

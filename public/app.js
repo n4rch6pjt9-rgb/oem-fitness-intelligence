@@ -1,6 +1,6 @@
-import {displayValue,fieldLabel} from '/assets/vocabulary.js';
+import {displayValue,fieldLabel,productLabel} from '/assets/vocabulary.js';
 const $=id=>document.getElementById(id);
-let selected=null,page=1,query='',total=0,queuePage=1,queueTotal=0,loggedIn=false,factories=[];
+let selected=null,page=1,query='',total=0,queuePage=1,queueTotal=0,queueTrash=false,loggedIn=false,factories=[];
 const message=(text,error=false)=>{$('message').textContent=text;$('message').className=error?'error':'';};
 async function api(url,options={}) {
   const response=await fetch('/api'+url,{...options,headers:{'Content-Type':'application/json',...options.headers}});
@@ -14,6 +14,7 @@ function link(url,text){const a=node('a',text);try{const u=new URL(url);if(u.pro
 function image(url){const img=node('img');try{const u=new URL(url);if(u.protocol==='https:')img.src=u.href;}catch{}img.loading='lazy';img.alt='Imagem publicada pelo fabricante';return img;}
 const formatNumber=value=>new Intl.NumberFormat('pt-BR').format(value??0);
 const dimensions=value=>Array.isArray(value)?value.join(' × ')+' mm':'Não informadas';
+function adDimensions(ad){const values=[...new Set((ad.attributes?.extraction?.specifications??[]).filter(row=>row.field==='dimensions').map(row=>displayValue('dimensions',row.value)).filter(Boolean))];return values.length?values.map((value,index)=>(values.length>1?'Contexto '+(index+1)+': ':'')+value).join(' / '):dimensions(ad.dimensions_mm);}
 const price=ad=>ad.price_min===null?'Preço não informado':`${ad.currency??'Moeda não informada'} ${ad.price_min}${ad.price_max!==null&&ad.price_max!==ad.price_min?' – '+ad.price_max:''}`;
 function coverage(f){
   const pending=Number(f.queued)+Number(f.running)+Number(f.errors);
@@ -28,12 +29,12 @@ async function refreshFactories(){
 }
 async function refreshAds(){
   if(!selected)return;const data=await api(`/factories/${selected}/ads?page=${page}&q=${encodeURIComponent(query)}`);total=data.total;$('products').replaceChildren();
-  for(const ad of data.items){const card=node('article',undefined,'product');if(ad.images?.[0])card.append(image(ad.images[0]));card.append(node('p',ad.model??'Modelo não declarado','model'),node('h3',ad.title),node('p',price(ad)),node('p',`Montado: ${dimensions(ad.dimensions_mm)}`));const b=node('button','Ver dados e fonte');b.onclick=()=>run(()=>showDetail(ad.id));card.append(b);$('products').append(card);}
+  for(const ad of data.items){const card=node('article',undefined,'product');if(ad.images?.[0])card.append(image(ad.images[0]));card.append(node('p',ad.model??'Modelo não declarado','model'),node('h3',productLabel(ad.title,ad.model,ad.attributes?.extraction?.product?.name)),node('p',price(ad)),node('p',`Montado: ${adDimensions(ad)}`));const b=node('button','Ver dados e fonte');b.onclick=()=>run(()=>showDetail(ad.id));card.append(b);$('products').append(card);}
   if(!data.items.length)$('products').append(node('p','Nenhum anúncio coletado para esta consulta. Confira a fila e os erros de coleta.'));
   $('page-label').textContent=`Página ${page} de ${Math.max(1,Math.ceil(total/24))} · ${formatNumber(total)} anúncios`;$('previous').disabled=page===1;$('next').disabled=page*24>=total;
 }
 async function showDetail(id){
-  const ad=await api('/ads/'+id),content=$('detail-content');content.replaceChildren(node('h2',ad.title),node('p',ad.model??'Modelo não declarado'),node('p',price(ad)),link(ad.source_url,'Abrir anúncio original'),node('p',`Coletado em ${new Date(ad.collected_at).toLocaleString('pt-BR')}`));
+  const ad=await api('/ads/'+id),content=$('detail-content');content.replaceChildren(node('h2',productLabel(ad.title,ad.model,ad.attributes?.extraction?.product?.name)),node('p',ad.model??'Modelo não declarado'),node('p',price(ad)),link(ad.source_url,'Abrir anúncio original'),node('p',`Coletado em ${new Date(ad.collected_at).toLocaleString('pt-BR')}`));
   const gallery=node('div',undefined,'detail-images');for(const url of ad.images??[])gallery.append(image(url));content.append(gallery);
   const lines=(ad.lines??[]).map(x=>x.oem_lines?.name).filter(Boolean);content.append(node('p','Grupos da fonte: '+(lines.join(', ')||'Ainda não vinculados')));
   const extraction=ad.attributes?.extraction;
@@ -42,8 +43,9 @@ async function showDetail(id){
   const table=node('table');for(const[key,value]of Object.entries(ad.attributes??{})){if(key==='extraction')continue;const row=node('tr');row.append(node('th',key),node('td',value));table.append(row);}content.append(node('h3','Atributos declarados na fonte'),table);$('detail').showModal();
 }
 async function refreshQueue(){
-  if(!selected)return;const data=await api(`/factories/${selected}/pages?page=${queuePage}`);queueTotal=data.total;$('queue-list').replaceChildren();
-  for(const item of data.items){const row=node('div');row.append(node('strong',`${item.state} · ${item.kind} · tentativas ${item.attempts} · HTTP ${item.http_status??'—'}`),node('br'),link(item.url,item.url));if(item.error)row.append(node('p',item.error));$('queue-list').append(row);}
+  if(!$('queue-trash')){const toggle=node('button','Lixeira da fila');toggle.id='queue-trash';toggle.onclick=()=>run(async()=>{queueTrash=!queueTrash;queuePage=1;toggle.textContent=queueTrash?'Ver fila ativa':'Lixeira da fila';await refreshQueue();});$('queue-list').before(toggle);}
+  if(!selected)return;const data=await api(`/factories/${selected}/pages?page=${queuePage}&deleted=${queueTrash}`);queueTotal=data.total;$('queue-list').replaceChildren();
+  for(const item of data.items){const row=node('div');row.append(node('strong',`${item.state} · ${item.kind} · tentativas ${item.attempts} · HTTP ${item.http_status??'—'}`),node('br'),link(item.url,item.url));if(item.error)row.append(node('p',item.error));const remove=node('button',queueTrash?'Restaurar':'Excluir da fila');remove.disabled=item.state==='running';remove.onclick=()=>run(async()=>{if(!queueTrash&&!confirm('Excluir este item da fila? Ele poderá ser restaurado na lixeira.'))return;const factoryId=selected;await api('/factories/'+factoryId+'/pages/'+item.id+(queueTrash?'/restore':''),{method:queueTrash?'POST':'DELETE'});await refreshFactories();await refreshQueue();});row.append(remove);$('queue-list').append(row);}
   $('queue-label').textContent=`Página ${queuePage} de ${Math.max(1,Math.ceil(queueTotal/50))}`;$('queue-previous').disabled=queuePage===1;$('queue-next').disabled=queuePage*50>=queueTotal;
 }
 async function run(action){try{await action();}catch(e){message(e.message,true);}}
