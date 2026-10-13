@@ -4,7 +4,7 @@ import { unwrap } from './crawler.mjs';
 import { InputError } from './client-api.mjs';
 
 const bucket = 'oem-product-media';
-const categories = new Set(['photo','dimensions','construction','colors','accessories','video']);
+const categories = new Set(['photo','dimensions','construction','colors','accessories','details','description','delivery','video']);
 const extensions = {'image/jpeg':'jpg','image/png':'png','image/webp':'webp','video/mp4':'mp4'};
 
 export function validateMedia(body, mime, category) {
@@ -19,7 +19,15 @@ export function validateMedia(body, mime, category) {
   if (!matches) throw new InputError('O conteúdo não corresponde ao formato informado.', 400);
 }
 
-export function registerMediaRoutes(app, db, wrap) {
+export function mediaUploader(operatorId, testOperatorId) {
+  const id = operatorId === 'local-test-operator' ? testOperatorId : operatorId;
+  if (typeof id !== 'string' || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id)) {
+    throw new InputError('Configure um usuário Auth válido em OEM_OPERATOR_IDS para testar o envio local.',400);
+  }
+  return id;
+}
+
+export function registerMediaRoutes(app, db, wrap, {testOperatorId = null} = {}) {
   const withUrl = row => ({...row, url: db.storage.from(bucket).getPublicUrl(row.object_path).data.publicUrl});
   app.get('/api/ads/:id/media', wrap(async(req,res) => {
     const rows = unwrap(await db.from('oem_product_media').select('id,category,caption,object_path,mime_type,byte_size,created_at')
@@ -43,11 +51,12 @@ export function registerMediaRoutes(app, db, wrap) {
     validateMedia(req.body,mime,category);
     const ad = unwrap(await db.from('oem_ads').select('id,factory_id').eq('id',req.params.id).maybeSingle());
     if (!ad) throw new InputError('Produto não encontrado.',404);
+    const uploadedBy = mediaUploader(req.operator.id,testOperatorId);
     const id = randomUUID();
     const path = ad.factory_id + '/' + ad.id + '/' + id + '.' + extensions[mime];
     unwrap(await db.storage.from(bucket).upload(path,req.body,{contentType:mime,upsert:false}));
     const saved = await db.from('oem_product_media').insert({id,ad_id:ad.id,category,caption,
-      object_path:path,mime_type:mime,byte_size:req.body.length,uploaded_by:req.operator.id})
+      object_path:path,mime_type:mime,byte_size:req.body.length,uploaded_by:uploadedBy})
       .select('id,category,caption,object_path,mime_type,byte_size,created_at').single();
     if (saved.error) {
       const cleanup = await db.storage.from(bucket).remove([path]);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import {validateMedia,registerMediaRoutes} from '../src/product-media.mjs';
+import {validateMedia,registerMediaRoutes,mediaUploader} from '../src/product-media.mjs';
 const png = Buffer.from([137,80,78,71,13,10,26,10,0]);
 test('rejects mismatched content, categories and oversized images', () => {
   assert.doesNotThrow(() => validateMedia(png,'image/png','dimensions'));
@@ -38,7 +38,7 @@ test('removes uploaded object when metadata persistence fails', async t => {
     },
   };
   const app=express();
-  app.use((req,res,next)=>{req.operator={id:'operator'};next();});
+  app.use((req,res,next)=>{req.operator={id:'a9fd6a29-49ba-42d9-8067-51c7b4d23e0f'};next();});
   const wrap=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(next);
   registerMediaRoutes(app,db,wrap);
   app.use((error,req,res,next)=>res.status(500).json({error:'Failed'}));
@@ -51,4 +51,12 @@ test('removes uploaded object when metadata persistence fails', async t => {
   assert.equal(response.status,500);
   assert.equal(removed.length,1);
   assert.match(removed[0],/^factory\/ad\/.*\.png$/);
+});
+
+test('test uploads require a configured UUID and preserve authenticated attribution', () => {
+  const id='a9fd6a29-49ba-42d9-8067-51c7b4d23e0f';
+  assert.equal(mediaUploader('local-test-operator',id),id);
+  assert.equal(mediaUploader(id,null),id);
+  assert.throws(()=>mediaUploader('local-test-operator',null));
+  assert.throws(()=>mediaUploader('local-test-operator','invalid'));
 });

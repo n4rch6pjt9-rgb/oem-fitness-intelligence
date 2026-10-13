@@ -102,7 +102,7 @@ app.use((req,res,next)=>{
   app.post('/api/factories/:id/assisted/preview',express.json({limit:'9mb'}),wrap(async(req,res)=>res.json(await assisted.preview(req.params.id,req.sisSession,req.body))));
   app.post('/api/factories/:id/assisted/save',wrap(async(req,res)=>res.json(await assisted.save(req.params.id,req.sisSession,req.body.token))));
   registerCatalogRoutes(app,db,wrap);
-  registerMediaRoutes(app,db,wrap);
+  registerMediaRoutes(app,db,wrap,{testOperatorId:testAuthBypass?[...allowed][0]:null});
   app.get('/api/ads/:id',wrap(async(req,res)=>{
     const ad=unwrap(await db.from('oem_ads').select('*').eq('id',req.params.id).maybeSingle());if(!ad)return res.status(404).json({error:'Anúncio não encontrado.'});
     ad.lines=unwrap(await db.from('oem_ad_lines').select('oem_lines(name,source_url)').eq('ad_id',ad.id));res.json(ad);

@@ -333,10 +333,21 @@ export function PrintSheetApp() {
     ...imageMedia.filter(item => item.category !== 'photo'),
   ];
   const mediaPages: typeof gallery[] = [];
-  for (let index = 0; index < gallery.length; index += 2) mediaPages.push(gallery.slice(index,index + 2));
+  const mediaTitles: Record<string,string> = {
+    photo:'Fotos do equipamento', dimensions:'Medidas do equipamento',
+    construction:'Construção', colors:'Cores', accessories:'Acessórios',
+    details:'Detalhes da máquina', description:'Descrição do produto',
+    delivery:'Despacho do produto',
+  };
+  for (const category of Object.keys(mediaTitles)) {
+    const items = gallery.filter(image => image.category === category);
+    const perPage = 2;
+    for (let index = 0; index < items.length; index += perPage) mediaPages.push(items.slice(index,index + perPage));
+  }
   const videos = (product.media ?? []).filter(item => item.category === 'video');
-  if (!mediaPages.length && videos.length) mediaPages.push([]);
-  const totalPages = 2 + mediaPages.length;
+  const videoPages: ProductMedia[][] = [];
+  for (let index = 0; index < videos.length; index += 8) videoPages.push(videos.slice(index,index + 8));
+  const totalPages = 2 + mediaPages.length + videoPages.length;
 
 
 
@@ -439,23 +450,40 @@ export function PrintSheetApp() {
 
       {mediaPages.map((images,index) => (
         <article key={'media-' + index} className="sheet-page" aria-label="Imagens do equipamento">
-          {header(String(index + 2).padStart(2,'0') + ' / Imagens do equipamento')}
+          {header(String(index + 2).padStart(2,'0') + ' / ' + (mediaTitles[images[0]?.category] ?? 'Imagens do equipamento'))}
           <div className="sheet-identity"><h1>{name}</h1><p>Modelo {product.model ?? 'Não informado'}</p></div>
+          {images[0]?.category === 'delivery' && <p className="sheet-note">Imagens da operação de embalagem e despacho apresentadas pelo fabricante.</p>}
           {images.map(image => (
-            <figure key={image.id}>
+            <figure key={image.id} style={{margin:'0 0 4mm',padding:'3mm',border:'1px solid #e5e5e5',breakInside:'avoid'}}>
               {failedPhotos.includes(image.url) ? <p>Imagem indisponível</p> : (
                 <img className="sheet-photo" src={image.url} alt={image.caption}
-                  style={{width:'100%',height:'85mm',objectFit:'contain'}} />
+                  style={{width:'100%',height:images.length === 1 ? '170mm' : '85mm',objectFit:'contain'}} />
               )}
-              <figcaption>{image.caption}</figcaption>
+              <figcaption style={{marginTop:'3mm',fontSize:'11pt',lineHeight:1.4,overflowWrap:'anywhere'}}>{image.caption}</figcaption>
             </figure>
-          ))}
-          {index === 0 && videos.map(video => (
-            <p key={video.id}><a href={video.url} target="_blank" rel="noopener noreferrer">Abrir vídeo: {video.caption}</a></p>
           ))}
           {footer(index + 2)}
         </article>
       ))}
+
+      {videoPages.map((items,index) => {
+        const page = mediaPages.length + index + 2;
+        return (
+          <article key={'videos-' + index} className="sheet-page" aria-label="Vídeos do equipamento">
+            {header(String(page).padStart(2,'0') + ' / Vídeos do equipamento')}
+            <div className="sheet-identity"><h1>{name}</h1><p>Modelo {product.model ?? 'Não informado'}</p></div>
+            <section>
+              <h2>Demonstrações em vídeo</h2>
+              {items.map(video => (
+                <p key={video.id} style={{marginBottom:'8mm',overflowWrap:'anywhere'}}>
+                  <a href={video.url} target="_blank" rel="noopener noreferrer">Abrir vídeo: {video.caption}</a>
+                </p>
+              ))}
+            </section>
+            {footer(page)}
+          </article>
+        );
+      })}
 
       <article
         className="sheet-page"
