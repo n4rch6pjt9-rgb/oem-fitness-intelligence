@@ -8,7 +8,7 @@ const categories = new Set(['photo','dimensions','construction','colors','access
 const extensions = {'image/jpeg':'jpg','image/png':'png','image/webp':'webp','video/mp4':'mp4'};
 
 export function validateMedia(body, mime, category) {
-  if (!categories.has(category) || !(mime in extensions)) throw new InputError('Categoria ou formato não permitido.', 400);
+  if (!categories.has(category) || !Object.hasOwn(extensions, mime)) throw new InputError('Categoria ou formato não permitido.', 400);
   if ((category === 'video') !== (mime === 'video/mp4')) throw new InputError('Use MP4 para vídeo e uma imagem nas outras categorias.', 400);
   const limit = category === 'video' ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
   if (!Buffer.isBuffer(body) || !body.length || body.length > limit) throw new InputError('Limite: imagens de 10 MB ou vídeo de 50 MB.', 400);
