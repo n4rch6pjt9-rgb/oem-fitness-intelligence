@@ -1,4 +1,5 @@
 import express from 'express';
+import { registerMediaRoutes } from './src/product-media.mjs';
 import { createAssistedCollection } from './src/assisted-collection.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'node:crypto';
@@ -101,6 +102,7 @@ app.use((req,res,next)=>{
   app.post('/api/factories/:id/assisted/preview',express.json({limit:'9mb'}),wrap(async(req,res)=>res.json(await assisted.preview(req.params.id,req.sisSession,req.body))));
   app.post('/api/factories/:id/assisted/save',wrap(async(req,res)=>res.json(await assisted.save(req.params.id,req.sisSession,req.body.token))));
   registerCatalogRoutes(app,db,wrap);
+  registerMediaRoutes(app,db,wrap);
   app.get('/api/ads/:id',wrap(async(req,res)=>{
     const ad=unwrap(await db.from('oem_ads').select('*').eq('id',req.params.id).maybeSingle());if(!ad)return res.status(404).json({error:'Anúncio não encontrado.'});
     ad.lines=unwrap(await db.from('oem_ad_lines').select('oem_lines(name,source_url)').eq('ad_id',ad.id));res.json(ad);
@@ -111,7 +113,7 @@ app.use((req,res,next)=>{
   }));
   registerClientRoutes(app,db,wrap);
   registerSiscomexRoutes(app,{status:req=>siscomex.status(req),connect:req=>siscomex.connect(req),products:req=>siscomex.products(req),disconnect:req=>siscomex.disconnect(req)},wrap);
-  app.use((error,_req,res,_next)=>{if(error instanceof InputError)return res.status(error.status).json({error:error.message});console.error('Falha na operação:',error.name);res.status(500).json({error:'Operação falhou. Verifique a configuração e o banco.'});});
+  app.use((error,_req,res,_next)=>{if(error.type==='entity.too.large')return res.status(413).json({error:'Arquivo maior que o limite permitido.'});if(error instanceof InputError)return res.status(error.status).json({error:error.message});console.error('Falha na operação:',error.name);res.status(500).json({error:'Operação falhou. Verifique a configuração e o banco.'});});
   let timer;
   if(crawler&&env.CRAWLER_ENABLED==='true')timer=setInterval(()=>crawler.step().catch(e=>console.error('Worker:',e.name)),2000);
   const cleanup=setInterval(()=>{const now=Date.now();for(const[id,s]of sessions)if(s.expiresAt<now)sessions.delete(id);for(const[k,v]of loginAttempts)if(v.until<now)loginAttempts.delete(k);},60000);cleanup.unref();
