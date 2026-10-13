@@ -341,7 +341,7 @@ export function PrintSheetApp() {
   };
   for (const category of Object.keys(mediaTitles)) {
     const items = gallery.filter(image => image.category === category);
-    const perPage = ['details','description','delivery'].includes(category) ? 1 : 2;
+    const perPage = 2;
     for (let index = 0; index < items.length; index += perPage) mediaPages.push(items.slice(index,index + perPage));
   }
   const videos = (product.media ?? []).filter(item => item.category === 'video');
@@ -454,12 +454,12 @@ export function PrintSheetApp() {
           <div className="sheet-identity"><h1>{name}</h1><p>Modelo {product.model ?? 'Não informado'}</p></div>
           {images[0]?.category === 'delivery' && <p className="sheet-note">Imagens da operação de embalagem e despacho apresentadas pelo fabricante.</p>}
           {images.map(image => (
-            <figure key={image.id}>
+            <figure key={image.id} style={{margin:'0 0 4mm',padding:'3mm',border:'1px solid #e5e5e5',breakInside:'avoid'}}>
               {failedPhotos.includes(image.url) ? <p>Imagem indisponível</p> : (
                 <img className="sheet-photo" src={image.url} alt={image.caption}
-                  style={{width:'100%',height:images.length === 1 ? '180mm' : '85mm',objectFit:'contain'}} />
+                  style={{width:'100%',height:images.length === 1 ? '170mm' : '85mm',objectFit:'contain'}} />
               )}
-              <figcaption>{image.caption}</figcaption>
+              <figcaption style={{marginTop:'3mm',fontSize:'11pt',lineHeight:1.4,overflowWrap:'anywhere'}}>{image.caption}</figcaption>
             </figure>
           ))}
           {footer(index + 2)}
