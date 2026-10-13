@@ -4,7 +4,7 @@ import { unwrap } from './crawler.mjs';
 import { InputError } from './client-api.mjs';
 
 const bucket = 'oem-product-media';
-const categories = new Set(['photo','dimensions','construction','colors','accessories','video']);
+const categories = new Set(['photo','dimensions','construction','colors','accessories','details','description','delivery','video']);
 const extensions = {'image/jpeg':'jpg','image/png':'png','image/webp':'webp','video/mp4':'mp4'};
 
 export function validateMedia(body, mime, category) {
