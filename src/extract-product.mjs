@@ -2,6 +2,7 @@ import { load } from 'cheerio';
 import { classifyUsage } from './classify-usage.mjs';
 const clean = value => String(value ?? '').replace(/\s+/g, ' ').trim();
 const aliases = new Map(Object.entries({
+  'hsmodel number':'model','model number':'model','brand name':'brand','packing size':'packing_dimensions','n.w.':'net_weight','n.w':'net_weight','weight stacks':'weight_stack','max weight stacks':'max_weight_stack',
   'model no.':'model','model no':'model','item number':'model',name:'name','product name':'name',trademark:'brand',
   specification:'dimensions',size:'dimensions','product size':'dimensions','steel tube size':'tube_size',
   'weight stack':'weight_stack',moq:'moq','min. order':'moq',delivery:'delivery_time','delivery time':'delivery_time',
@@ -26,7 +27,8 @@ export function extractProduct(html, sourceUrl) {
     if(records.some(x=>x.field===field&&x.value===value&&x.source_section===section))return;
     records.push(record);result[commercial.test(field)?'commercial_terms':'specifications'].push(record);
   }
-  $('.bsc-item').each((_,e)=>put($(e).find('.bac-item-label').text(),$(e).find('.bac-item-value').text(),'Basic Info.'));
+  for(const property of ld.additionalProperty ?? [])put(property.name,property.value,'Product JSON-LD');
+  $('.bsc-item,.bac-item').each((_,e)=>put($(e).find('.bac-item-label').text(),$(e).find('.bac-item-value').text(),'Basic Info.'));
   const header=clean($('.sr-proMainInfo-baseInfo-propertyPrice').text());
   if(header){const price=header.match(/(?:US\$|\$)[\d,.]+(?:\s*[-–]\s*(?:US\$|\$)?[\d,.]+)?/);if(price)put('price',price[0],'Overview');const moq=header.match(/\d+\s*(?:Pieces?|Sets?)\s*\(MOQ\)/i);if(moq)put('MOQ',moq[0],'Overview');}
   $('.detail-desc tr').each((_,e)=>{const cells=$(e).children('td,th');if(cells.length===2)put(cells.eq(0).text(),cells.eq(1).text(),'Product Description / table');});

@@ -1,4 +1,5 @@
 import express from 'express';
+import {registerDeletionRoutes} from './src/deletion-api.mjs';
 import { registerMediaRoutes } from './src/product-media.mjs';
 import { createAssistedCollection } from './src/assisted-collection.mjs';
 import { createClient } from '@supabase/supabase-js';
@@ -94,7 +95,7 @@ app.use((req,res,next)=>{
     if(!row)return res.status(404).json({error:'Fábrica não encontrada.'});res.json({ok:true,worker_enabled:env.CRAWLER_ENABLED==='true'});
   }));
   app.post('/api/factories/:id/retry',wrap(async(req,res)=>{
-    unwrap(await db.from('oem_pages').update({state:'queued',attempts:0,error:null,available_at:new Date().toISOString()}).eq('factory_id',req.params.id).eq('state','error'));res.json({ok:true});
+    unwrap(await db.from('oem_pages').update({state:'queued',attempts:0,error:null,available_at:new Date().toISOString()}).eq('factory_id',req.params.id).is('deleted_at',null).eq('state','error'));res.json({ok:true});
   }));
   const assisted=db?createAssistedCollection(db,crawler.persistProduct):null;
   app.post('/api/factories/:id/assisted/listing/preview',express.json({limit:'9mb'}),wrap(async(req,res)=>res.json(await assisted.previewListing(req.params.id,req.sisSession,req.body))));
@@ -102,14 +103,18 @@ app.use((req,res,next)=>{
   app.post('/api/factories/:id/assisted/preview',express.json({limit:'9mb'}),wrap(async(req,res)=>res.json(await assisted.preview(req.params.id,req.sisSession,req.body))));
   app.post('/api/factories/:id/assisted/save',wrap(async(req,res)=>res.json(await assisted.save(req.params.id,req.sisSession,req.body.token))));
   registerCatalogRoutes(app,db,wrap);
+  registerDeletionRoutes(app,db,wrap);
   registerMediaRoutes(app,db,wrap,{testOperatorId:testAuthBypass?[...allowed][0]:null});
   app.get('/api/ads/:id',wrap(async(req,res)=>{
-    const ad=unwrap(await db.from('oem_ads').select('*').eq('id',req.params.id).maybeSingle());if(!ad)return res.status(404).json({error:'Anúncio não encontrado.'});
+    const ad=unwrap(await db.from('oem_ads').select('*').eq('id',req.params.id).is('deleted_at',null).maybeSingle());if(!ad)return res.status(404).json({error:'Anúncio não encontrado.'});
     ad.lines=unwrap(await db.from('oem_ad_lines').select('oem_lines(name,source_url)').eq('ad_id',ad.id));res.json(ad);
   }));
   app.get('/api/factories/:id/pages',wrap(async(req,res)=>{
     const page=Number(req.query.page??1);if(!Number.isInteger(page)||page<1||page>100000)return res.status(400).json({error:'Página inválida.'});
-    const result=await db.from('oem_pages').select('id,url,kind,state,attempts,http_status,error,completed_at',{count:'exact'}).eq('factory_id',req.params.id).order('created_at').order('id').range((page-1)*50,page*50-1);unwrap(result);res.json({items:result.data,total:result.count,page,size:50});
+    const queueDeleted=req.query.deleted==='true';
+    let queueQuery=db.from('oem_pages').select('id,url,kind,state,attempts,http_status,error,completed_at',{count:'exact'}).eq('factory_id',req.params.id);
+    queueQuery=queueDeleted?queueQuery.not('deleted_at','is',null):queueQuery.is('deleted_at',null);
+    const result=await queueQuery.order('created_at').order('id').range((page-1)*50,page*50-1);unwrap(result);res.json({items:result.data,total:result.count,page,size:50});
   }));
   registerClientRoutes(app,db,wrap);
   registerSiscomexRoutes(app,{status:req=>siscomex.status(req),connect:req=>siscomex.connect(req),products:req=>siscomex.products(req),disconnect:req=>siscomex.disconnect(req)},wrap);

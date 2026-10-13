@@ -31,6 +31,8 @@ import {
   classLabel,
   applicationLabel,
   capitalize,
+  productLabel,
+  productDescription,
   sourceSectionLabel,
 } from "./vocabulary";
 interface Evidence {
@@ -159,12 +161,7 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
   return data as T;
 }
 function productName(item: Item) {
-  return (
-    displayValue("name", item.attributes?.extraction?.product?.name ?? "") ??
-    (item.model
-      ? `Equipamento ${item.model}`
-      : "Equipamento sem modelo informado")
-  );
+  return productLabel(item.title,item.model,item.attributes?.extraction?.product?.name);
 }
 function validPhoto(url: string) {
   try {
@@ -242,10 +239,12 @@ function ProductSheet({
   item,
   factory,
   onBack,
+  onDelete,
 }: {
   item: Item;
   factory: string;
   onBack: () => void;
+  onDelete: () => void;
 }) {
   const [photo, setPhoto] = useState(0);
   const extraction = item.attributes?.extraction;
@@ -278,6 +277,7 @@ function ProductSheet({
           <Printer data-icon="inline-start" />
           Imprimir ficha
         </Button>
+        <Button variant="outline" onClick={onDelete}>Excluir produto</Button>
       </div>
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap gap-2">
@@ -297,6 +297,7 @@ function ProductSheet({
           ))}
         </div>
         <h2 className="text-3xl font-semibold">{productName(item)}</h2>
+        {productDescription(item.title) && <p>{productDescription(item.title)}</p>}
       </div>
       <div className="grid items-start gap-5 lg:grid-cols-2">
         <Card>
@@ -438,6 +439,7 @@ export function CatalogApp() {
   const [linesLoading, setLinesLoading] = useState(false);
   const [error, setError] = useState("");
   const [unauthorized, setUnauthorized] = useState(false);
+  const [trash,setTrash] = useState(false);
   const [revision, setRevision] = useState(0);
   const [captureUrl, setCaptureUrl] = useState("");
   const [captureHtml, setCaptureHtml] = useState("");
@@ -450,7 +452,7 @@ export function CatalogApp() {
     () => () => {
       detailRequest.current?.abort();
     },
-    [factory, line, page, query, revision, unauthorized],
+    [factory, line, page, query, revision, unauthorized, trash],
   );
   function fail(error: unknown) {
     if (error instanceof DOMException && error.name === "AbortError") return;
@@ -504,7 +506,7 @@ export function CatalogApp() {
     setLoading(true);
     setError("");
     setData(null);
-    const params = new URLSearchParams({ page: String(page), q: query });
+    const params = new URLSearchParams({ page: String(page), q: query, deleted:String(trash) });
     if (line) params.set("line_id", line);
     api<Page>(`/factories/${factory}/ads?${params}`, controller.signal)
       .then(setData)
@@ -514,6 +516,17 @@ export function CatalogApp() {
       });
     return () => controller.abort();
   }, [factory, line, page, query, revision, unauthorized]);
+  async function removeProduct(item: Item,restore=false) {
+    if(!restore && !window.confirm('Excluir este produto do catálogo? Os dados e mídias poderão ser restaurados na lixeira.'))return;
+    setLoading(true); setError('');
+    try {
+      const response=await fetch('/api/ads/'+item.id+(restore?'/restore':''),{method:restore?'POST':'DELETE'});
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error ?? 'Operação indisponível.');
+      setDetail(null); setRevision(value=>value+1);
+    }catch(reason){fail(reason);}
+    finally{setLoading(false);}
+  }
   async function openItem(id: string) {
     detailRequest.current?.abort();
     const controller = new AbortController();
@@ -627,6 +640,7 @@ export function CatalogApp() {
                 item={detail}
                 factory={currentFactory?.name ?? "Fábrica"}
                 onBack={() => setDetail(null)}
+                onDelete={()=>void removeProduct(detail)}
               />
             ) : (
               <>
@@ -906,6 +920,7 @@ export function CatalogApp() {
                     </CardContent>
                   </Card>
                 )}
+                <Button variant="outline" disabled={loading} onClick={()=>{setTrash(value=>!value);setPage(1);}}>{trash?"Voltar ao catálogo":"Lixeira de produtos"}</Button>
                 <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                   {data?.items.map((item) => (
                     <Card key={item.id}>
@@ -932,9 +947,9 @@ export function CatalogApp() {
                         <Button
                           variant="outline"
                           disabled={loading}
-                          onClick={() => void openItem(item.id)}
+                          onClick={() => void (trash?removeProduct(item,true):openItem(item.id))}
                         >
-                          Abrir ficha
+                          {trash?"Restaurar produto":"Abrir ficha"}
                           <ChevronRight data-icon="inline-end" />
                         </Button>
                       </CardFooter>

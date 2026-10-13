@@ -167,3 +167,18 @@ test('conflicting technical claims preserve source blocks without inventing vari
     )
   );
 });
+
+test('HSModel Number and Brand Name are recognized without changing evidence',()=>{
+  const html='<h1>Pec Fly</h1><div class="detail-desc"><table><tr><td>HSModel Number</td><td>HS02</td></tr><tr><td>Brand Name</td><td>BRTW</td></tr></table></div>';
+  const data=extractProduct(html,origin+'/product/example/example.html');
+  assert.equal(data.product.model,'HS02');
+  assert.equal(data.product.brand,'BRTW');
+  assert.ok(data.specifications.some(row=>row.field==='model'&&row.value==='HS02'&&row.source_section==='Product Description / table'));
+});
+test('JSON-LD size and description size remain conflicting declarations',()=>{
+  const html='<script type="application/ld+json">{"@type":"Product","name":"Chest Press","additionalProperty":[{"name":"Size","value":"1500*1100*1630mm"}]}</script><div class="detail-desc"><table><tr><td>Size</td><td>1040*1450*1630mm</td></tr></table></div>';
+  const data=extractProduct(html,origin+'/product/example/example.html');
+  const conflict=data.conflicts.find(row=>row.field==='dimensions');
+  assert.equal(conflict.values.length,2);
+  assert.deepEqual(new Set(conflict.values.map(row=>row.source_section)),new Set(['Product JSON-LD','Product Description / table']));
+});

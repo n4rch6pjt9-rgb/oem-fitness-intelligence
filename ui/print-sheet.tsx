@@ -6,6 +6,8 @@ import {
   fieldLabel,
   classLabel,
   applicationLabel,
+  productLabel,
+  productDescription,
   sourceSectionLabel,
 } from './vocabulary';
 
@@ -38,6 +40,7 @@ interface Product {
   attributes?: {
     extraction?: {
       product?: {
+        title?: string | null;
         name?: string | null;
         brand?: string | null;
       };
@@ -246,9 +249,7 @@ export function PrintSheetApp() {
 
   const extraction = product?.attributes?.extraction;
 
-  const name =
-    displayValue('name', extraction?.product?.name ?? '') ??
-    `Equipamento ${product?.model ?? ''}`;
+  const name = productLabel(extraction?.product?.title ?? '',product?.model ?? null,extraction?.product?.name);
 
   useEffect(() => {
     if (product) {
@@ -403,6 +404,7 @@ export function PrintSheetApp() {
 
         <div className="sheet-identity">
           <h1>{name}</h1>
+          {productDescription(extraction.product?.title ?? "") && <p className="sheet-description">{productDescription(extraction.product?.title ?? "")}</p>}
 
           <p>
             <strong>
@@ -449,19 +451,21 @@ export function PrintSheetApp() {
       </article>
 
       {mediaPages.map((images,index) => (
-        <article key={'media-' + index} className="sheet-page" aria-label="Imagens do equipamento">
+        <article key={'media-' + index} className="sheet-page sheet-media-page" aria-label="Imagens do equipamento">
           {header(String(index + 2).padStart(2,'0') + ' / ' + (mediaTitles[images[0]?.category] ?? 'Imagens do equipamento'))}
           <div className="sheet-identity"><h1>{name}</h1><p>Modelo {product.model ?? 'Não informado'}</p></div>
           {images[0]?.category === 'delivery' && <p className="sheet-note">Imagens da operação de embalagem e despacho apresentadas pelo fabricante.</p>}
+          <div className={"sheet-media-grid" + (images.length === 1 ? " sheet-media-single" : "")}>
           {images.map(image => (
-            <figure key={image.id} style={{margin:'0 0 4mm',padding:'3mm',border:'1px solid #e5e5e5',breakInside:'avoid'}}>
+            <figure key={image.id} className="sheet-media-figure">
               {failedPhotos.includes(image.url) ? <p>Imagem indisponível</p> : (
                 <img className="sheet-photo" src={image.url} alt={image.caption}
-                  style={{width:'100%',height:images.length === 1 ? '170mm' : '85mm',objectFit:'contain'}} />
+                  />
               )}
-              <figcaption style={{marginTop:'3mm',fontSize:'11pt',lineHeight:1.4,overflowWrap:'anywhere'}}>{image.caption}</figcaption>
+              <figcaption>{image.caption}</figcaption>
             </figure>
           ))}
+          </div>
           {footer(index + 2)}
         </article>
       ))}

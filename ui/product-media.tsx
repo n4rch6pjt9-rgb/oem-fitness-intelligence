@@ -18,6 +18,8 @@ const categories = [
 ];
 
 export function MediaUpload({adId}: {adId: string}) {
+  const [trash,setTrash] = useState(false);
+  const [revision,setRevision] = useState(0);
   const [media,setMedia] = useState<ProductMedia[]>([]);
   const [category,setCategory] = useState("photo");
   const [caption,setCaption] = useState("");
@@ -29,7 +31,7 @@ export function MediaUpload({adId}: {adId: string}) {
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const controller = new AbortController();
-    void fetch("/api/ads/" + adId + "/media",{signal:controller.signal})
+    void fetch("/api/ads/" + adId + "/media?deleted=" + trash,{signal:controller.signal})
       .then(async response => {
         if (!response.ok) throw new Error("Não foi possível consultar as mídias.");
         return response.json() as Promise<ProductMedia[]>;
@@ -37,7 +39,7 @@ export function MediaUpload({adId}: {adId: string}) {
       .then(items => {setMedia(items); setLoaded(true);})
       .catch(reason => {if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Consulta indisponível.");});
     return () => controller.abort();
-  },[adId]);
+  },[adId,trash,revision]);
   async function upload() {
     if (!file || !caption.trim() || !published || busy) return;
     const limit = category === "video" ? 50 : 10;
@@ -55,6 +57,17 @@ export function MediaUpload({adId}: {adId: string}) {
       if (input.current) input.current.value = "";
     } catch(reason) {setError(reason instanceof Error ? reason.message : "Falha no envio.");}
     finally {setBusy(false);}
+  }
+  async function remove(item: ProductMedia) {
+    if (!trash && !window.confirm('Excluir este arquivo da ficha? Ele ficará na lixeira e poderá ser restaurado.')) return;
+    setBusy(true); setError('');
+    try {
+      const response=await fetch('/api/ads/'+adId+'/media/'+item.id+(trash?'/restore':''),{method:trash?'POST':'DELETE'});
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error ?? 'Operação indisponível.');
+      setRevision(value=>value+1);
+    } catch(reason){setError(reason instanceof Error?reason.message:'Falha na operação.');}
+    finally{setBusy(false);}
   }
   return <Card>
     <CardHeader><CardTitle>Imagens e vídeo da ficha</CardTitle></CardHeader>
@@ -76,12 +89,13 @@ export function MediaUpload({adId}: {adId: string}) {
         Este arquivo pode ser disponibilizado ao comprador por link público.
       </label>
       {error && <p role="alert">{error}</p>}
-      <Button type="button" disabled={!loaded || busy || !file || !caption.trim() || !published} onClick={() => void upload()}>
+      <Button type="button" disabled={trash || !loaded || busy || !file || !caption.trim() || !published} onClick={() => void upload()}>
         {busy ? "Enviando…" : "Enviar para a ficha"}
       </Button>
       {loaded && <p role="status">{media.length} arquivos disponíveis na ficha.</p>}
+      <Button type="button" variant="outline" disabled={busy} onClick={()=>setTrash(value=>!value)}>{trash?"Ver arquivos ativos":"Lixeira de arquivos"}</Button>
       <ul className="space-y-2">
-        {media.map(item => <li key={item.id}><a href={item.url} target="_blank" rel="noopener noreferrer" className="underline">{item.caption}</a></li>)}
+        {media.map(item => <li key={item.id}><a href={item.url} target="_blank" rel="noopener noreferrer" className="underline">{item.caption}</a><Button type="button" variant="outline" disabled={busy} onClick={()=>void remove(item)}>{trash?"Restaurar":"Excluir arquivo"}</Button></li>)}
       </ul>
     </CardContent>
   </Card>;
