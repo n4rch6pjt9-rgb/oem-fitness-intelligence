@@ -335,8 +335,9 @@ export function PrintSheetApp() {
   const mediaPages: typeof gallery[] = [];
   for (let index = 0; index < gallery.length; index += 2) mediaPages.push(gallery.slice(index,index + 2));
   const videos = (product.media ?? []).filter(item => item.category === 'video');
-  if (!mediaPages.length && videos.length) mediaPages.push([]);
-  const totalPages = 2 + mediaPages.length;
+  const videoPages: ProductMedia[][] = [];
+  for (let index = 0; index < videos.length; index += 8) videoPages.push(videos.slice(index,index + 8));
+  const totalPages = 2 + mediaPages.length + videoPages.length;
 
 
 
@@ -450,12 +451,28 @@ export function PrintSheetApp() {
               <figcaption>{image.caption}</figcaption>
             </figure>
           ))}
-          {index === 0 && videos.map(video => (
-            <p key={video.id}><a href={video.url} target="_blank" rel="noopener noreferrer">Abrir vídeo: {video.caption}</a></p>
-          ))}
           {footer(index + 2)}
         </article>
       ))}
+
+      {videoPages.map((items,index) => {
+        const page = mediaPages.length + index + 2;
+        return (
+          <article key={'videos-' + index} className="sheet-page" aria-label="Vídeos do equipamento">
+            {header(String(page).padStart(2,'0') + ' / Vídeos do equipamento')}
+            <div className="sheet-identity"><h1>{name}</h1><p>Modelo {product.model ?? 'Não informado'}</p></div>
+            <section>
+              <h2>Demonstrações em vídeo</h2>
+              {items.map(video => (
+                <p key={video.id} style={{marginBottom:'8mm',overflowWrap:'anywhere'}}>
+                  <a href={video.url} target="_blank" rel="noopener noreferrer">Abrir vídeo: {video.caption}</a>
+                </p>
+              ))}
+            </section>
+            {footer(page)}
+          </article>
+        );
+      })}
 
       <article
         className="sheet-page"
