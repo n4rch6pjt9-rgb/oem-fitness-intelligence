@@ -287,16 +287,9 @@ export function PrintSheetApp() {
    * com registros antigos. O extrator atual não promove conflitos técnicos
    * automaticamente para esse campo.
    */
-  const conflicts = extraction.conflicts ?? [];
-
-  const conflictingFields = new Set(
-    conflicts.map((conflict) => conflict.field),
-  );
-
   const technical = rows(
     (extraction.specifications ?? []).filter(
       (row) =>
-        !conflictingFields.has(row.field) &&
         ![
           'model',
           'name',
@@ -426,7 +419,7 @@ export function PrintSheetApp() {
           </p>
         )}
 
-        
+
 
         <section>
           <h2>Especificações do equipamento</h2>
