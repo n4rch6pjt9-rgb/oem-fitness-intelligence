@@ -30,6 +30,7 @@ import {
   classLabel,
   applicationLabel,
   capitalize,
+  sourceSectionLabel,
 } from "./vocabulary";
 interface Evidence {
   field: string;
@@ -48,6 +49,10 @@ interface Extraction {
   contextual_variants?: {
     field: string;
     values: { value: string; declared_class?: string | null }[];
+  }[];
+  conflicts?: {
+    field: string;
+    values: Evidence[];
   }[];
   usage_classification?: {
     declared_class?: string | null;
@@ -253,6 +258,10 @@ function ProductSheet({
     ),
   ];
   const usage = extraction?.usage_classification;
+  const conflicts = extraction?.conflicts ?? [];
+  const conflictingFields = new Set(
+    conflicts.map((conflict) => conflict.field),
+  );
   const lines =
     item.lines?.flatMap((line) =>
       line.oem_lines?.name ? [line.oem_lines.name] : [],
@@ -288,7 +297,7 @@ function ProductSheet({
         </div>
         <h2 className="text-3xl font-semibold">{productName(item)}</h2>
       </div>
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid items-start gap-5 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>
@@ -355,39 +364,35 @@ function ProductSheet({
         </Card>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2">
-            {extraction.contextual_variants?.map((group) => (
-              <Card key={group.field}>
-                <CardHeader>
-                  <CardTitle>
-                    <Badge variant="outline">
-                      <Settings data-icon="inline-start" />
-                      {fieldLabel(group.field)}
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-3">
-                  {group.values.map((variant, index) => (
-                    <div
-                      className="flex flex-col items-start gap-2"
-                      key={index}
-                    >
-                      <Badge variant="secondary">
-                        <Layers data-icon="inline-start" />
-                        {variant.declared_class
-                          ? classLabel(variant.declared_class)
-                          : `Configuração ${index + 1}`}
-                      </Badge>
-                      <p>
-                        {displayValue(group.field, variant.value) ??
-                          "Valor aguarda padronização"}
-                      </p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {conflicts.length > 0 && (
+  <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+    {conflicts.map((conflict) => (
+      <Card key={conflict.field}>
+        <CardHeader>
+          <CardTitle>
+            <Badge variant="outline">
+              <Info data-icon="inline-start" />
+              {fieldLabel(conflict.field)}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-start gap-3">
+          {conflict.values.map((evidence, index) => (
+            <Badge
+              key={`${evidence.source_section}-${index}`}
+              variant="secondary"
+              className="max-w-full whitespace-normal text-left"
+            >
+              <Layers data-icon="inline-start" />
+              Contexto {index + 1} · {displayValue(conflict.field, evidence.value) ?? "Valor aguarda padronização"}
+            </Badge>
+          ))}
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+)}
+
           <Tabs defaultValue="technical">
             <TabsList>
               <TabsTrigger value="technical">
@@ -399,16 +404,15 @@ function ProductSheet({
                 Condições comerciais
               </TabsTrigger>
             </TabsList>
+
             <TabsContent value="technical">
               <Records
                 records={(extraction.specifications ?? []).filter(
-                  (record) =>
-                    !extraction.contextual_variants?.some(
-                      (variant) => variant.field === record.field,
-                    ),
+                  (record) => !conflictingFields.has(record.field),
                 )}
               />
             </TabsContent>
+
             <TabsContent value="commercial">
               <Records records={extraction.commercial_terms ?? []} />
             </TabsContent>
