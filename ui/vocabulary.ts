@@ -8,6 +8,30 @@ export function capitalize(value:string){return value?value[0].toLocaleUpperCase
 export function fieldLabel(field:string){return vocabulary.fields[field as keyof typeof vocabulary.fields]??'Informação complementar';}
 export function classLabel(value:string|null){return vocabulary.classes[value as keyof typeof vocabulary.classes]??'Classe não informada';}
 export function applicationLabel(value:string){return vocabulary.applications[value as keyof typeof vocabulary.applications]??'Aplicação não informada';}
+
+export function sourceSectionLabel(value:string):string {
+ const exact:Record<string,string>={
+  'Overview':'Vis\u00e3o geral',
+  'Basic Info.':'Informa\u00e7\u00f5es b\u00e1sicas',
+  'Basic Info':'Informa\u00e7\u00f5es b\u00e1sicas',
+  'Product Description':'Descri\u00e7\u00e3o do produto',
+  'Product Description / table':'Descri\u00e7\u00e3o do produto / tabela'
+ };
+ if(exact[value])return exact[value];
+
+ const faq=value.match(/^Product Description \/ FAQ Q(\d+):\s*(.+)$/i);
+ if(faq){
+  const questions:Record<string,string>={
+   'What is the MOQ?':'Qual \u00e9 o pedido m\u00ednimo?',
+   'How about the payment?':'Quais s\u00e3o as condi\u00e7\u00f5es de pagamento?',
+   'How long about the delivery time?':'Qual \u00e9 o prazo de entrega?'
+  };
+  return `Descri\u00e7\u00e3o do produto / FAQ Q${faq[1]}: ${questions[faq[2]] ?? faq[2]}`;
+ }
+
+ return value;
+}
+
 const translations:Record<string,string>={
  'Chest Press':'Supino sentado','Adult':'Adulto','Unisex':'Unissex','Chest':'Peitoral','Steel':'Aço','Plywood Box':'Caixa de compensado','Shandong, China':'Shandong, China','Customized Logo Availabled':'Marca personalizada','Customised':'Personalizável','More Colors for Choice or Customised':'Cores disponíveis ou personalizadas','Available':'Disponível','Green, yellow, or customized':'Verde, Amarelo ou personalizado','Professional gym club/Fitness center':'Academia e centro de treinamento','Community, Gymnasium, Home':'Comunidade, Academia e residência'
 };
