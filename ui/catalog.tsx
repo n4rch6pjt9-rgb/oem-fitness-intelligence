@@ -85,7 +85,7 @@ interface Item {
   title: string;
   model: string | null;
   images: string[] | null;
-  attributes?: { extraction?: Extraction } | null;
+  attributes?: { extraction?: Extraction; import_review?: {status:string; declared_models?:string[]} } | null;
   lines?: { oem_lines: { name: string } | null }[];
 }
 interface Page {
@@ -300,6 +300,7 @@ function ProductSheet({
             </Badge>
           ))}
         </div>
+        {item.attributes?.import_review?.status === 'identity_conflict' && <p><Badge variant="outline">Identificação em revisão</Badge> {item.attributes.import_review.declared_models?.join(' / ')}</p>}
         <CatalogHierarchy hierarchy={item.hierarchy} manufacturer={factory} />
         <h2 className="text-3xl font-semibold">{productName(item)}</h2>
         {productDescription(item.title) && <p>{productDescription(item.title)}</p>}
@@ -941,6 +942,7 @@ export function CatalogApp() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="flex flex-col gap-4">
+                        {item.attributes?.import_review?.status === 'identity_conflict' && <p><Badge variant="outline">Identificação em revisão</Badge> {item.attributes.import_review.declared_models?.join(' / ')}</p>}
                         <CatalogHierarchy hierarchy={item.hierarchy} compact />
                         <p>{item.advertisements?.length ?? 1} anúncio(s) preservado(s)</p>
                         <Photo url={item.images?.[0]} alt={productName(item)} />

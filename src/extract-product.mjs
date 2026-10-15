@@ -4,6 +4,7 @@ import { classifyUsage } from './classify-usage.mjs';
 const normalizeModel = value => modelKey(value);
 const clean = value => String(value ?? '').replace(/\s+/g, ' ').trim();
 const aliases = new Map(Object.entries({
+  "n ° de modelo.":"model","modelo n.º":"model","número do modelo":"model","nome do produto":"name","marca registrada":"brand","marca":"brand","fonte de energia":"power_source","grupo de idade":"age_group","certificação":"declared_certifications","certificado":"declared_certifications","parte exercício":"exercise_part","gênero":"gender","utensílio":"appliance","logótipo":"logo","função":"function","tipo":"type","especificação":"dimensions","origem":"origin","código hs":"hs_code","tubo":"tube_size","cor do tubo":"frame_color","cor da almofada":"cushion_color","peso":"net_weight","cor":"colors","espessura do aço":"tube_thickness","nome do item":"name","número do item":"model","prazo de pagamento":"payment_terms","espessura do tubo":"tube_thickness","série":"serie","tamanho":"dimensions","embalagem":"packing_type","cor da moldura":"frame_color","g.w.":"gross_weight","tamanho do tubo":"tube_size","almofada do banco":"cushion_color","comodidades":"features","gama de aplicação":"application","tempo de entrega":"delivery_time","usando período":"application",
   'variant':'variant','configuration':'configuration','model version':'model_version','hsmodel number':'model','model number':'model','brand name':'brand','packing size':'packing_dimensions','n.w.':'net_weight','n.w':'net_weight','weight stacks':'weight_stack','max weight stacks':'max_weight_stack',
   'model no.':'model','model no':'model','item number':'model',name:'name','product name':'name',trademark:'brand',
   specification:'dimensions',size:'dimensions','product size':'dimensions','steel tube size':'tube_size',
@@ -24,8 +25,9 @@ export function extractProduct(html, sourceUrl) {
   const commercial = /moq|price|currency|payment|delivery|warranty|after.?sale|after.?service|order|lead.?time/i;
   function put(label,value,section) {
     label=clean(label).replace(/:$/,'');value=clean(value);if(!label||!value)return;
-    const field=aliases.get(label.toLowerCase())??label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/_$/,'');
-    const record={field,value,source_section:section};
+    let field=aliases.get(label.toLowerCase())??label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/_$/,'');
+    if(label.toLowerCase()==='especificação'&&!/\d+\s*(?:mm|cm|m)?\s*[*x×]\s*\d+/i.test(value))field='specification';
+    const record={field,value,source_section:section,...(new URL(sourceUrl).hostname==='pt.made-in-china.com'?{source_label:label}:{})};
     if(records.some(x=>x.field===field&&x.value===value&&x.source_section===section))return;
     records.push(record);result[commercial.test(field)?'commercial_terms':'specifications'].push(record);
   }

@@ -1,7 +1,7 @@
 // These rules classify supplier wording, not mechanical performance or suitability.
 export function classifyUsage(title, specifications) {
   const evidence=[];
-  const candidates=[{field:'title',value:title,source_section:'Overview / title'},...specifications.filter(x=>['application','appliance','use_class','usage','intended_use','use','function','serie'].includes(x.field))];
+  const candidates=[{field:'title',value:title,source_section:'Overview / title'},...specifications.filter(x=>['application','appliance','use_class','usage','intended_use','use','function','serie','type'].includes(x.field))];
   const applications=new Set();const classes=new Set();
   for(const record of candidates) {
     if(typeof record.value!=='string'||!record.value.trim())continue;
