@@ -1,4 +1,4 @@
-import { canonicalUrl, parsePage } from './parser.mjs';
+import { canonicalUrl, parsePage, belongsToFactory } from './parser.mjs';
 import { renderPage } from './render-page.mjs';
 
 export function unwrap(result) { if(result.error) throw new Error(result.error.message); return result.data; }
@@ -6,6 +6,8 @@ export function createCrawler(db, fetchPage=renderPage) {
   let busy=false;
   async function enqueue(factoryId, url, kind='listing', lineIds=[]) {
     url=canonicalUrl(url);
+    const owner=unwrap(await db.from('oem_factories').select('domain').eq('id',factoryId).single());
+    if(!belongsToFactory(url,owner.domain)) throw new Error('URL não pertence à fábrica da fila.');
     const existing=unwrap(await db.from('oem_pages').select('id').eq('url',url).maybeSingle());
     const page=existing??unwrap(await db.from('oem_pages').upsert({factory_id:factoryId,url,kind,priority:kind==='product'?10:100},{onConflict:'url',ignoreDuplicates:true}).select('id').single());
     for(const line_id of lineIds) unwrap(await db.from('oem_page_lines').upsert({page_id:page.id,line_id},{onConflict:'page_id,line_id'}));
@@ -25,7 +27,7 @@ export function createCrawler(db, fetchPage=renderPage) {
       if(!page) return null;
       const target=canonicalUrl(page.url);
       const factory=unwrap(await db.from('oem_factories').select('domain').eq('id',page.factory_id).single());
-      if(new URL(target).hostname!==factory.domain) throw new Error('URL não pertence à fábrica da fila.');
+      if(!belongsToFactory(target,factory.domain)) throw new Error('URL não pertence à fábrica da fila.');
       const r=await fetchPage(target,{redirect:'manual',signal:AbortSignal.timeout(30000),headers:{'User-Agent':'OEMCatalogPilot/0.1','Accept':'text/html','Accept-Language':'en-US,en;q=0.9'}});
       unwrap(await db.from('oem_pages').update({http_status:r.status}).eq('id',page.id));
       if(!r.ok) throw new Error(`Fonte retornou HTTP ${r.status}.`);

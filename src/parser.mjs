@@ -9,7 +9,7 @@ export function canonicalUrl(value, base) {
 
   if (
     u.protocol !== 'https:' ||
-    !/^[a-z0-9-]+\.en\.made-in-china\.com$/i.test(u.hostname) ||
+    !(/^[a-z0-9-]+\.en\.made-in-china\.com$/i.test(u.hostname) || (u.hostname === 'pt.made-in-china.com' && /^\/co_[a-z0-9-]+\/(?:product_(?!group_).+\.html|product-group\/[^/]+_\d+\.html)$/i.test(u.pathname))) ||
     u.username ||
     u.password ||
     u.port
@@ -30,6 +30,30 @@ export function canonicalUrl(value, base) {
   u.search = '';
   u.hash = '';
   return u.href;
+}
+
+
+// Portuguese storefronts share a host; the supplier slug identifies the factory.
+export function belongsToFactory(value, domain) {
+  const u = new URL(canonicalUrl(value));
+  if (u.hostname === domain) return true;
+  const slug = domain.match(/^([a-z0-9-]+)\.en\.made-in-china\.com$/i)?.[1];
+  return !!slug && u.hostname === 'pt.made-in-china.com' &&
+    u.pathname.toLowerCase().startsWith('/co_' + slug.toLowerCase() + '/');
+}
+export function isProductUrl(value) {
+  const u = new URL(canonicalUrl(value));
+  return u.hostname === 'pt.made-in-china.com'
+    ? /^\/co_[a-z0-9-]+\/product_(?!group_).+\.html$/i.test(u.pathname)
+    : /^\/product\/[^/]+\/[^/]+\.html$/.test(u.pathname);
+}
+export function isFirstGroupUrl(value) {
+  const u = new URL(canonicalUrl(value));
+  return u.hostname === 'pt.made-in-china.com'
+    ? /^\/co_[a-z0-9-]+\/product-group\/[^/]+_1\.html$/i.test(u.pathname)
+    : u.pathname === '/productList' && u.searchParams.get('isByGroup') === '1' &&
+      /^[a-zA-Z0-9]+$/.test(u.searchParams.get('productGroupOrCatId') ?? '') &&
+      u.searchParams.get('pageNumber') === '1';
 }
 
 const clean = value =>
