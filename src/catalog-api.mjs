@@ -1,3 +1,5 @@
+import { dimensions } from './parser.mjs';
+import { resolveMeasurements } from './measurements.mjs';
 import { unwrap } from './crawler.mjs';
 import { InputError } from './client-api.mjs';
 
@@ -12,12 +14,29 @@ async function requireFactory(db, id) {
   const factory = unwrap(await db.from('oem_factories').select('id').eq('id', id).maybeSingle());
   if (!factory) throw new InputError('Fábrica não encontrada.', 404);
 }
+export function withMeasurements(ad) {
+  const extraction = ad.attributes?.extraction;
+  return extraction ? {...ad, measurements: resolveMeasurements(extraction, dimensions)} : ad;
+}
 export function createCatalogApi(db) {
   return {
     async lines(factoryId) {
       await requireFactory(db, factoryId);
       const items = unwrap(await db.from('oem_lines').select('id,name,source_url').eq('factory_id', factoryId).order('name').order('id'));
       return { items };
+    },
+    async skus(factoryId, input = {}) {
+      const {page = '1', q = '', line_id: lineId, deleted = 'false'} = input;
+      if (typeof page !== 'string' || !/^\d+$/.test(page) || Number(page)<1 || Number(page)>100000) throw new InputError('Página inválida.');
+      if (typeof q !== 'string' || q.length>120 || !['true','false'].includes(deleted)) throw new InputError('Filtro inválido.');
+      if (lineId !== undefined) identifier(lineId, 'Identificador da linha');
+      await requireFactory(db, factoryId);
+      if (lineId !== undefined) {
+        const line = unwrap(await db.from('oem_lines').select('id').eq('id', lineId).eq('factory_id', factoryId).maybeSingle());
+        if (!line) throw new InputError('Linha não encontrada nesta fábrica.',404);
+      }
+      const result = unwrap(await db.rpc('oem_catalog_skus', {target_factory:factoryId, page_number:Number(page), search_text:q, target_line:lineId ?? null, archived:deleted==='true'}));
+      return {...result, items:result.items.map(withMeasurements)};
     },
     async ads(factoryId, input = {}) {
       const { page: rawPage = '1', q = '', line_id: lineId } = input;
@@ -36,7 +55,7 @@ export function createCatalogApi(db) {
       if (input.deleted !== undefined && !['true','false'].includes(input.deleted)) throw new InputError('Filtro de exclusão inválido.');
       query=input.deleted==='true'?query.not('deleted_at','is',null):query.is('deleted_at',null);
       if (q) query = query.ilike('title', `%${q.replace(/[\\%_]/g, character => '\\' + character)}%`);
-      const result = await query.order('source_url').order('id').range((page - 1) * size, page * size - 1);
+      const result = await query.order('model',{ascending:true,nullsFirst:false}).order('title').order('id').range((page - 1) * size, page * size - 1);
       const items = unwrap(result).map(({ oem_ad_lines: _association, ...item }) => item);
       return { items, total: result.count, page, size };
     }
@@ -45,6 +64,7 @@ export function createCatalogApi(db) {
 // Register only after the server's authenticated-operator middleware.
 export function registerCatalogRoutes(app, db, wrap) {
   const catalog = createCatalogApi(db);
+  app.get('/api/factories/:id/skus', wrap(async (req, res) => res.json(await catalog.skus(req.params.id, req.query))));
   app.get('/api/factories/:id/lines', wrap(async (req, res) => res.json(await catalog.lines(req.params.id))));
   app.get('/api/factories/:id/ads', wrap(async (req, res) => res.json(await catalog.ads(req.params.id, req.query))));
 }

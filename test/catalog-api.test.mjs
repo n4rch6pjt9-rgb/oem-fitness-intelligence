@@ -52,7 +52,7 @@ test('filtro por linha pagina no banco, preserva contagem superior a mil e não 
   assert.equal(query.searchParams.get('offset'), '1008');
   assert.equal(query.searchParams.get('ilike'), null);
   assert.equal(query.searchParams.get('title'), 'ilike.%Máquina\\_50\\%%');
-  assert.equal(query.searchParams.get('order'), 'source_url.asc,id.asc');
+  assert.equal(query.searchParams.get('order'), 'model.asc.nullslast,title.asc,id.asc');
   assert.equal(calls.filter(url => url.pathname.endsWith('oem_ad_lines')).length, 0);
 });
 test('linha de outra fábrica é rejeitada antes de consultar produtos', async () => {
@@ -79,6 +79,6 @@ test('rotas novas e filtro não contornam autenticação do servidor', async () 
   await new Promise(resolve => server.once('listening', resolve));
   try {
     const base = `http://127.0.0.1:${server.address().port}`;
-    for (const path of [`/api/factories/${factory}/lines`, `/api/factories/${factory}/ads?line_id=${line}`]) assert.equal((await fetch(base + path)).status, 401);
+    for (const path of [`/api/factories/${factory}/lines`, `/api/factories/${factory}/ads?line_id=${line}`, `/api/factories/${factory}/skus`]) assert.equal((await fetch(base + path)).status, 401);
   } finally { runtime.close(); await new Promise(resolve => server.close(resolve)); }
 });

@@ -1,3 +1,5 @@
+import { catalogHierarchy } from './src/catalog-identity.mjs';
+import { withMeasurements } from './src/catalog-api.mjs';
 import express from 'express';
 import {registerDeletionRoutes} from './src/deletion-api.mjs';
 import { registerMediaRoutes } from './src/product-media.mjs';
@@ -107,7 +109,13 @@ app.use((req,res,next)=>{
   registerMediaRoutes(app,db,wrap,{testOperatorId:testAuthBypass?[...allowed][0]:null});
   app.get('/api/ads/:id',wrap(async(req,res)=>{
     const ad=unwrap(await db.from('oem_ads').select('*').eq('id',req.params.id).is('deleted_at',null).maybeSingle());if(!ad)return res.status(404).json({error:'Anúncio não encontrado.'});
-    ad.lines=unwrap(await db.from('oem_ad_lines').select('oem_lines(name,source_url)').eq('ad_id',ad.id));res.json(ad);
+    ad.lines=unwrap(await db.from('oem_ad_lines').select('oem_lines(name,source_url)').eq('ad_id',ad.id));
+    ad.factory_name=unwrap(await db.from('oem_factories').select('name').eq('id',ad.factory_id).single()).name;
+    ad.hierarchy=await catalogHierarchy(db,ad);
+    ad.advertisements=ad.sku_id
+      ? unwrap(await db.from('oem_ads').select('id,title,source_url').eq('sku_id',ad.sku_id).is('deleted_at',null))
+      : [{id:ad.id,title:ad.title,source_url:ad.source_url}];
+    res.json(withMeasurements(ad));
   }));
   app.get('/api/factories/:id/pages',wrap(async(req,res)=>{
     const page=Number(req.query.page??1);if(!Number.isInteger(page)||page<1||page>100000)return res.status(400).json({error:'Página inválida.'});

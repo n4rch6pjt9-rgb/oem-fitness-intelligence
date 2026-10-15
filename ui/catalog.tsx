@@ -1,3 +1,4 @@
+import { CatalogHierarchy, measurementRows, type Hierarchy, type Measurements } from './catalog-hierarchy';
 import React, { useEffect, useRef, useState } from "react";
 import { MediaUpload } from "./product-media";
 import {
@@ -77,6 +78,9 @@ interface Line {
   source_url: string;
 }
 interface Item {
+  hierarchy?: Hierarchy | null;
+  measurements?: Measurements;
+  advertisements?: {id:string; title:string; source_url:string}[];
   id: string;
   title: string;
   model: string | null;
@@ -260,7 +264,7 @@ function ProductSheet({
   const usage = extraction?.usage_classification;
   const conflicts = extraction?.conflicts ?? [];
   const conflictingFields = new Set(
-    conflicts.map((conflict) => conflict.field),
+    conflicts.filter(conflict => item.measurements?.method !== 'same_configuration_volume' || !['dimensions','packing_dimensions'].includes(conflict.field)).map((conflict) => conflict.field),
   );
   const lines =
     item.lines?.flatMap((line) =>
@@ -296,6 +300,7 @@ function ProductSheet({
             </Badge>
           ))}
         </div>
+        <CatalogHierarchy hierarchy={item.hierarchy} manufacturer={factory} />
         <h2 className="text-3xl font-semibold">{productName(item)}</h2>
         {productDescription(item.title) && <p>{productDescription(item.title)}</p>}
       </div>
@@ -337,7 +342,7 @@ function ProductSheet({
             <CardTitle>
               <Badge>
                 <Dumbbell data-icon="inline-start" />
-                {classLabel(usage?.declared_class ?? null)}
+                Aplicações declaradas pelo fornecedor
               </Badge>
             </CardTitle>
           </CardHeader>
@@ -354,6 +359,9 @@ function ProductSheet({
           </CardContent>
         </Card>
       </div>
+      {item.advertisements && <Card><CardHeader><CardTitle>Anúncios e evidências do SKU</CardTitle></CardHeader><CardContent className="flex flex-col gap-2">{item.advertisements.map(ad => <p key={ad.id}><a href={'/ficha.html?id='+encodeURIComponent(ad.id)}>{ad.title}</a> · <a href={ad.source_url} target="_blank" rel="noopener noreferrer">Fonte original</a></p>)}</CardContent></Card>}
+      {item.measurements?.method === 'same_configuration_volume' && <p>Medidas da mesma configuração: maior volume classificado como montada e menor como embalagem. Declarações originais preservadas.</p>}
+      {item.measurements?.method === 'requires_review' && <p>Medidas aguardam revisão da configuração.</p>}
       <MediaUpload adId={item.id} />
       {!extraction ? (
         <Card>
@@ -410,7 +418,7 @@ function ProductSheet({
 
             <TabsContent value="technical">
               <Records
-                records={(extraction.specifications ?? []).filter(
+                records={measurementRows(extraction.specifications ?? [], item.measurements).filter(
                   (record) => !conflictingFields.has(record.field),
                 )}
               />
@@ -508,14 +516,14 @@ export function CatalogApp() {
     setData(null);
     const params = new URLSearchParams({ page: String(page), q: query, deleted:String(trash) });
     if (line) params.set("line_id", line);
-    api<Page>(`/factories/${factory}/ads?${params}`, controller.signal)
+    api<Page>(`/factories/${factory}/skus?${params}`, controller.signal)
       .then(setData)
       .catch(fail)
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [factory, line, page, query, revision, unauthorized]);
+  }, [factory, line, page, query, revision, unauthorized, trash]);
   async function removeProduct(item: Item,restore=false) {
     if(!restore && !window.confirm('Excluir este produto do catálogo? Os dados e mídias poderão ser restaurados na lixeira.'))return;
     setLoading(true); setError('');
@@ -722,7 +730,7 @@ export function CatalogApp() {
                         className="flex flex-col gap-2"
                         htmlFor="catalog-search"
                       >
-                        Título do produto
+                        Título ou SKU do produto
                         <input
                           id="catalog-search"
                           className="rounded-md border bg-background p-2"
@@ -898,7 +906,7 @@ export function CatalogApp() {
                       {loading
                         ? "Consultando total…"
                         : data
-                          ? `${data.total} Registros`
+                          ? `${data.total} SKUs / registros sem modelo`
                           : "Total indisponível"}
                     </Badge>
                     {Number(currentFactory.errors) > 0 && (
@@ -933,15 +941,11 @@ export function CatalogApp() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="flex flex-col gap-4">
+                        <CatalogHierarchy hierarchy={item.hierarchy} compact />
+                        <p>{item.advertisements?.length ?? 1} anúncio(s) preservado(s)</p>
                         <Photo url={item.images?.[0]} alt={productName(item)} />
                         <h2 className="font-semibold">{productName(item)}</h2>
-                        <Badge variant="secondary">
-                          <Dumbbell data-icon="inline-start" />
-                          {classLabel(
-                            item.attributes?.extraction?.usage_classification
-                              ?.declared_class ?? null,
-                          )}
-                        </Badge>
+
                       </CardContent>
                       <CardFooter>
                         <Button

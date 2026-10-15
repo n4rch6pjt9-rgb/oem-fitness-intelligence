@@ -1,8 +1,10 @@
+import { modelKey } from './catalog-identity.mjs';
 import { load } from 'cheerio';
 import { classifyUsage } from './classify-usage.mjs';
+const normalizeModel = value => modelKey(value);
 const clean = value => String(value ?? '').replace(/\s+/g, ' ').trim();
 const aliases = new Map(Object.entries({
-  'hsmodel number':'model','model number':'model','brand name':'brand','packing size':'packing_dimensions','n.w.':'net_weight','n.w':'net_weight','weight stacks':'weight_stack','max weight stacks':'max_weight_stack',
+  'variant':'variant','configuration':'configuration','model version':'model_version','hsmodel number':'model','model number':'model','brand name':'brand','packing size':'packing_dimensions','n.w.':'net_weight','n.w':'net_weight','weight stacks':'weight_stack','max weight stacks':'max_weight_stack',
   'model no.':'model','model no':'model','item number':'model',name:'name','product name':'name',trademark:'brand',
   specification:'dimensions',size:'dimensions','product size':'dimensions','steel tube size':'tube_size',
   'weight stack':'weight_stack',moq:'moq','min. order':'moq',delivery:'delivery_time','delivery time':'delivery_time',
@@ -40,7 +42,7 @@ export function extractProduct(html, sourceUrl) {
   for(const faq of faqs){const text=clean(faq[2]);const split=text.match(/^(.*?)A\s*\d*\s*[:.：]\s*([\s\S]*)$/i);if(!split)continue;const q=clean(split[1]),answer=split[2];let field=`faq_q${faq[1]}`;if(/delivery/i.test(q))field='delivery_time';else if(/minimum|moq/i.test(q))field='moq';else if(/payment/i.test(q))field='payment_terms';else if(/after.?sale|after.?service/i.test(q))field='after_sales';put(field,answer,`Product Description / FAQ Q${faq[1]}: ${q}`);}
   const highlighted=$('[class*="highlight"]').filter((_,e)=>/Product Highlights/i.test($(e).text())).first();
   if(highlighted.length)put('characteristics',highlighted.text(),'Product Highlights');
-  for(const field of ['name','brand','model']){const values=[...new Set(records.filter(x=>x.field===field).map(x=>x.value))];result.product[field]=values.length===1?values[0]:null;}
+  for(const field of ['name','brand','model']){const values=[...new Set(records.filter(x=>x.field===field).map(x=>field==='model'?normalizeModel(x.value):x.value))];result.product[field]=values.length===1?values[0]:null;}
   // Supplier identity is read from the shop identity, never from recommendation cards.
   result.supplier.name=clean($('a[href]').filter((_,e)=>{try{return new URL($(e).attr('href'),sourceUrl).origin===new URL(sourceUrl).origin&&/CO\.|LTD|COMPANY/i.test($(e).text());}catch{return false;}}).first().text())||null;
   const body=clean($('body').text());
@@ -54,7 +56,7 @@ export function extractProduct(html, sourceUrl) {
     if(seen.has(identity))continue;seen.add(identity);result.images.push({url:url.href,alt:null,source_section:'Product gallery / Product JSON-LD'});if(result.images.length===2)break;
   }
   if(result.images.length<2)result.limitations.push('Menos de duas fotos distintas identificadas na galeria.');
-  for(const field of new Set(records.map(x=>x.field))){const values=records.filter(x=>x.field===field).map(({value,source_section})=>({value,source_section}));if(new Set(values.map(x=>x.value)).size>1)result.conflicts.push({field,values});}
+  for(const field of new Set(records.map(x=>x.field))){const values=records.filter(x=>x.field===field).map(({value,source_section})=>({value,source_section}));if(new Set(values.map(x=>field==='model'?normalizeModel(x.value):x.value)).size>1)result.conflicts.push({field,values});}
   if(!highlighted.length)result.limitations.push('Product Highlights não identificado nesta captura.');
   result.limitations.push('Certificações e demais alegações são declarações do fornecedor, sem verificação independente.');
   result.usage_classification=classifyUsage(result.product.title,result.specifications);

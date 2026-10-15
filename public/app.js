@@ -14,8 +14,11 @@ function link(url,text){const a=node('a',text);try{const u=new URL(url);if(u.pro
 function image(url){const img=node('img');try{const u=new URL(url);if(u.protocol==='https:')img.src=u.href;}catch{}img.loading='lazy';img.alt='Imagem publicada pelo fabricante';return img;}
 const formatNumber=value=>new Intl.NumberFormat('pt-BR').format(value??0);
 const dimensions=value=>Array.isArray(value)?value.join(' × ')+' mm':'Não informadas';
-function adDimensions(ad){const values=[...new Set((ad.attributes?.extraction?.specifications??[]).filter(row=>row.field==='dimensions').map(row=>displayValue('dimensions',row.value)).filter(Boolean))];return values.length?values.map((value,index)=>(values.length>1?'Contexto '+(index+1)+': ':'')+value).join(' / '):dimensions(ad.dimensions_mm);}
+function adDimensions(ad){if(ad.measurements)return ad.measurements.method==='requires_review'?'Aguardam revisão da configuração':dimensions(ad.measurements.dimensions_mm);const values=[...new Set((ad.attributes?.extraction?.specifications??[]).filter(row=>row.field==='dimensions').map(row=>displayValue('dimensions',row.value)).filter(Boolean))];return values.length?values.map((value,index)=>(values.length>1?'Contexto '+(index+1)+': ':'')+value).join(' / '):dimensions(ad.dimensions_mm);}
 const price=ad=>ad.price_min===null?'Preço não informado':`${ad.currency??'Moeda não informada'} ${ad.price_min}${ad.price_max!==null&&ad.price_max!==ad.price_min?' – '+ad.price_max:''}`;
+function hierarchyLabel(ad) {
+  const h=ad.hierarchy;return (h?.family??'Família não identificada')+' > '+(h?.model??'SKU não identificado')+' > '+(h?.usages.map(u=>u.usage_class==='commercial'?'Commercial':'Light Commercial').join(' / ')||'Categoria não comprovada');
+}
 function coverage(f){
   const pending=Number(f.queued)+Number(f.running)+Number(f.errors);
   const comparison=f.expected_ads===null?'Total da fonte ainda não verificado.':`${formatNumber(f.ads)} anúncios coletados / ${formatNumber(f.expected_ads)} informados pela fonte.`;
@@ -28,13 +31,13 @@ async function refreshFactories(){
   const f=factories.find(x=>x.id===selected);if(f){$('factory-name').textContent=f.name;$('coverage').textContent=coverage(f);}
 }
 async function refreshAds(){
-  if(!selected)return;const data=await api(`/factories/${selected}/ads?page=${page}&q=${encodeURIComponent(query)}`);total=data.total;$('products').replaceChildren();
-  for(const ad of data.items){const card=node('article',undefined,'product');if(ad.images?.[0])card.append(image(ad.images[0]));card.append(node('p',ad.model??'Modelo não declarado','model'),node('h3',productLabel(ad.title,ad.model,ad.attributes?.extraction?.product?.name)),node('p',price(ad)),node('p',`Montado: ${adDimensions(ad)}`));const b=node('button','Ver dados e fonte');b.onclick=()=>run(()=>showDetail(ad.id));card.append(b);$('products').append(card);}
+  if(!selected)return;const data=await api(`/factories/${selected}/skus?page=${page}&q=${encodeURIComponent(query)}`);total=data.total;$('products').replaceChildren();
+  for(const ad of data.items){const card=node('article',undefined,'product');if(ad.images?.[0])card.append(image(ad.images[0]));card.append(node('p',hierarchyLabel(ad)),node('p',(ad.advertisements?.length??1)+' anúncio(s) preservado(s)'),node('p',ad.model??'Modelo não declarado','model'),node('h3',productLabel(ad.title,ad.model,ad.attributes?.extraction?.product?.name)),node('p',price(ad)),node('p',`Montado: ${adDimensions(ad)}`));const b=node('button','Ver dados e fonte');b.onclick=()=>run(()=>showDetail(ad.id));card.append(b);$('products').append(card);}
   if(!data.items.length)$('products').append(node('p','Nenhum anúncio coletado para esta consulta. Confira a fila e os erros de coleta.'));
   $('page-label').textContent=`Página ${page} de ${Math.max(1,Math.ceil(total/24))} · ${formatNumber(total)} anúncios`;$('previous').disabled=page===1;$('next').disabled=page*24>=total;
 }
 async function showDetail(id){
-  const ad=await api('/ads/'+id),content=$('detail-content');content.replaceChildren(node('h2',productLabel(ad.title,ad.model,ad.attributes?.extraction?.product?.name)),node('p',ad.model??'Modelo não declarado'),node('p',price(ad)),link(ad.source_url,'Abrir anúncio original'),node('p',`Coletado em ${new Date(ad.collected_at).toLocaleString('pt-BR')}`));
+  const ad=await api('/ads/'+id),content=$('detail-content');content.replaceChildren(node('p',hierarchyLabel(ad)),node('h2',productLabel(ad.title,ad.model,ad.attributes?.extraction?.product?.name)),node('p',ad.model??'Modelo não declarado'),node('p',price(ad)),link(ad.source_url,'Abrir anúncio original'),node('p',`Coletado em ${new Date(ad.collected_at).toLocaleString('pt-BR')}`));
   const gallery=node('div',undefined,'detail-images');for(const url of ad.images??[])gallery.append(image(url));content.append(gallery);
   const lines=(ad.lines??[]).map(x=>x.oem_lines?.name).filter(Boolean);content.append(node('p','Grupos da fonte: '+(lines.join(', ')||'Ainda não vinculados')));
   const extraction=ad.attributes?.extraction;
