@@ -129,7 +129,7 @@ export function parsePage(html, url) {
    * ============================================================
    */
 
-  if (/\/product\//.test(source.pathname)) {
+  if (/\/product\//.test(source.pathname) || /^\/co_[a-z0-9-]+\/product_(?!group_).+\.html$/i.test(source.pathname)) {
     if (!product || !clean(product.name)) {
       throw new Error(
         'Anúncio sem Product JSON-LD válido; revisão necessária.'

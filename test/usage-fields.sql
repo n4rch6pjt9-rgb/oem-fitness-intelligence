@@ -3,7 +3,7 @@ do $$
 declare f uuid; a uuid; field_name text; category text; n integer;
 begin
  insert into public.oem_factories(domain,name,source_url) values('usage-fields-fixture.test','Synthetic fixture','https://usage-fields-fixture.test') returning id into f;
- foreach field_name in array array['use','function','serie'] loop
+ foreach field_name in array array['use','function','serie','type'] loop
   foreach category in array array['Commercial Gym Use','Light Commercial','Not for commercial use'] loop
    insert into public.oem_ads(factory_id,source_url,title,model,content_hash,attributes)
     values(f,'https://usage-fields-fixture.test/'||field_name||'/'||replace(category,' ','-'),'Equipment','FIX'||field_name||replace(category,' ',''),'fixture',jsonb_build_object('extraction',jsonb_build_object('specifications',jsonb_build_array(jsonb_build_object('field',field_name,'value',category,'source_section','Basic Info.'))))) returning id into a;

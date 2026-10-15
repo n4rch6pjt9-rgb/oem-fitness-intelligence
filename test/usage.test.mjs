@@ -14,7 +14,7 @@ test('explicit commercial use in use, function and serie retains source evidence
  }
 });
 test('additional usage fields retain light commercial and reject negative claims',()=>{
- for(const field of ['use','function','serie']){
+ for(const field of ['use','function','serie','type']){
   assert.deepEqual(classifyUsage('Equipment',[{field,value:'Light Commercial',source_section:'Basic Info.'}]).declared_class_versions,['light_commercial']);
   assert.equal(classifyUsage('Equipment',[{field,value:'Not for commercial use',source_section:'Basic Info.'}]).declared_class,null);
  }
