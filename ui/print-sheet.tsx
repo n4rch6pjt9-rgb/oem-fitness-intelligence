@@ -1,3 +1,4 @@
+import { CatalogHierarchy, measurementRows, type Hierarchy, type Measurements } from './catalog-hierarchy';
 import React, { useEffect, useState } from 'react';
 import { Printer, ChevronLeft } from 'lucide-react';
 import { Button } from './components/ui/button';
@@ -31,14 +32,18 @@ interface ProductMedia {
 }
 
 interface Product {
+  hierarchy?: Hierarchy | null;
+  measurements?: Measurements;
   media?: ProductMedia[];
   id: string;
   factory_id: string;
+  factory_name?: string;
   model: string | null;
   images: string[] | null;
   lines?: { oem_lines: { name: string } | null }[];
   attributes?: {
     extraction?: {
+      supplier?: {name?: string | null};
       product?: {
         title?: string | null;
         name?: string | null;
@@ -301,7 +306,7 @@ export function PrintSheetApp() {
    * automaticamente para esse campo.
    */
   const technical = rows(
-    (extraction.specifications ?? []).filter(
+    measurementRows(extraction.specifications ?? [], product.measurements).filter(
       (row) =>
         ![
           'model',
@@ -366,7 +371,7 @@ export function PrintSheetApp() {
   const footer = (page: number) => (
     <footer className="sheet-footer">
       <span>
-        {extraction.product?.brand ?? 'Fabricante não informado'} ·{' '}
+        {product.factory_name ?? extraction.supplier?.name ?? 'Fabricante não informado'} ·{' '}
         {product.model ?? 'Modelo não informado'}
       </span>
 
@@ -401,8 +406,10 @@ export function PrintSheetApp() {
         aria-label="Ficha técnica para impressão"
       >
         {header('01 / Ficha técnica')}
+        {product.measurements?.method === 'same_configuration_volume' && <p>Maior volume: montada. Menor volume: embalagem. Declarações originais preservadas.</p>}
 
         <div className="sheet-identity">
+          <CatalogHierarchy hierarchy={product.hierarchy} manufacturer={product.factory_name ?? extraction.supplier?.name ?? undefined} compact />
           <h1>{name}</h1>
           {productDescription(extraction.product?.title ?? "") && <p className="sheet-description">{productDescription(extraction.product?.title ?? "")}</p>}
 

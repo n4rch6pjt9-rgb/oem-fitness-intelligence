@@ -1,3 +1,4 @@
+import { resolveMeasurements } from './measurements.mjs';
 import { load } from 'cheerio';
 import { createHash } from 'node:crypto';
 import { listingUrl } from './listing-url.mjs';
@@ -173,6 +174,8 @@ export function parsePage(html, url) {
     );
 
     const extraction = extractProduct(html, url);
+    const measurements = resolveMeasurements(extraction, dimensions);
+    extraction.measurement_resolution = measurements;
 
     const attr = (...keys) =>
       Object.entries(attrs).find(([k]) =>
@@ -227,22 +230,8 @@ export function parsePage(html, url) {
           ? null
           : attr('MOQ', 'Min. Order'),
 
-        dimensions_mm:
-          extraction.conflicts.some(
-            x => x.field === 'dimensions'
-          )
-            ? null
-            : dimensions(
-                attr(
-                  'Specification',
-                  'Product Size',
-                  'Size'
-                )
-              ),
-
-        packing_mm: dimensions(
-          attr('Package Size')
-        ),
+        dimensions_mm: measurements.dimensions_mm,
+        packing_mm: measurements.packing_mm,
 
         images: extraction.images.length
           ? extraction.images.map(x => x.url)
