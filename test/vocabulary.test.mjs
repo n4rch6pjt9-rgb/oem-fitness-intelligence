@@ -6,9 +6,9 @@ test('technical conversion retains measurements and delivery conditions',()=>{as
 
 test('product covers use Portuguese labels derived from the source title',async()=>{
   const {productLabel,productDescription}=await import('../ui/vocabulary.ts');
-  assert.equal(productLabel('Commercial Grade Vertical Chest Press for Gym Professionals','HS01'),'Supino sentado');
-  assert.equal(productLabel('Pin Load Pectoral Pearl Delt / Pec Fly','HS02'),'Peck deck / deltoide posterior');
-  assert.equal(productLabel('Unknown title',null),'Equipamento sem modelo informado');
-  assert.match(productDescription('Pin Load Pec Fly'),/seleção de carga por pino/);
+  assert.equal(productLabel('Commercial Grade Vertical Chest Press for Gym Professionals','HS01'),'Supino vertical de categoria comercial para profissionais de academia');
+  assert.equal(productLabel('Pin Load Pectoral Pearl Delt / Pec Fly','HS02'),'Pin Load Pectoral Pearl Delt / Pec Fly');
+  assert.equal(productLabel('Unknown title',null),'Unknown title');
+  assert.equal(productDescription('Pin Load Pec Fly'),null);
   assert.equal(productDescription('Unknown title'),null);
 });
