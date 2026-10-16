@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { load } from 'cheerio';
-import { canonicalUrl, parsePage } from './parser.mjs';
+import { canonicalUrl, parsePage, belongsToFactory, isProductUrl, isFirstGroupUrl } from './parser.mjs';
 import { InputError } from './client-api.mjs';
 import { unwrap } from './crawler.mjs';
 
@@ -190,8 +190,7 @@ export function createAssistedCollection(db, persistProduct, now = Date.now) {
       let url, lineUrl;
       try { url = canonicalUrl(body.url); lineUrl = canonicalUrl(body.line_url); } catch { throw new InputError('Use URLs válidas da loja Made-in-China.'); }
       const row = await factory(factoryId);
-      const productUrl = new URL(url), line = new URL(lineUrl);
-      if (productUrl.hostname !== row.domain || line.hostname !== row.domain || !/^\/product\/[^/]+\/[^/]+\.html$/.test(productUrl.pathname) || line.pathname !== '/productList' || line.searchParams.get('isByGroup') !== '1' || !/^[a-zA-Z0-9]+$/.test(line.searchParams.get('productGroupOrCatId') ?? '') || line.searchParams.get('pageNumber') !== '1') throw new InputError('A ficha e a primeira página da linha devem pertencer à fábrica selecionada.');
+      if (!belongsToFactory(url, row.domain) || !belongsToFactory(lineUrl, row.domain) || !isProductUrl(url) || !isFirstGroupUrl(lineUrl)) throw new InputError('A ficha e a primeira página da linha devem pertencer à fábrica selecionada.');
       const $ = load(body.html);
       const canonical = $('link[rel="canonical"]').attr('href');
       if (canonical && canonicalUrl(canonical, url) !== url) throw new InputError('O HTML pertence a outra ficha. Confira a URL.');
