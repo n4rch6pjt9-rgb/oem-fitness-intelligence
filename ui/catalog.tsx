@@ -396,7 +396,7 @@ function ProductSheet({
               className="max-w-full whitespace-normal text-left"
             >
               <Layers data-icon="inline-start" />
-              Contexto {index + 1} · {displayValue(conflict.field, evidence.value) ?? "Valor aguarda padronização"}
+              {evidence.source_section ? sourceSectionLabel(evidence.source_section) : `Contexto ${index + 1}`} · {displayValue(conflict.field, evidence.value) ?? (evidence.value.trim() || "Valor não informado na fonte")}
             </Badge>
           ))}
         </CardContent>
