@@ -159,7 +159,7 @@ function ConflictsTable({ conflicts }: { conflicts: Conflict[] }) {
 
               <td>
                 {displayValue(conflict.field, evidence.value) ??
-                  'Valor aguarda padronização'}
+                  (evidence.value.trim() || 'Valor não informado na fonte')}
               </td>
             </tr>
           )),
