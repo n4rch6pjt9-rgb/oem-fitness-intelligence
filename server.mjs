@@ -85,7 +85,9 @@ app.use((req,res,next)=>{
   app.post('/api/factories',wrap(async(req,res)=>{
     if(typeof req.body.url!=='string')return res.status(400).json({error:'Informe a URL da loja.'});
     let url;try{url=canonicalUrl(req.body.url);}catch(e){return res.status(400).json({error:e.message});}
-    const u=new URL(url),source_url=listingUrl(u.origin);
+    const u=new URL(url);
+    if(!/^[a-z0-9-]+\.en\.made-in-china\.com$/i.test(u.hostname))return res.status(400).json({error:'Para cadastrar uma fábrica, use a URL da loja no formato nome.en.made-in-china.com. Importe fichas em português na fábrica já cadastrada.'});
+    const source_url=listingUrl(u.origin);
     let factory=unwrap(await db.from('oem_factories').select('*').eq('domain',u.hostname).maybeSingle());
     if(!factory)factory=unwrap(await db.from('oem_factories').insert({domain:u.hostname,name:u.hostname,source_url}).select('*').single());
     await crawler.enqueue(factory.id,source_url);res.status(201).json(factory);
