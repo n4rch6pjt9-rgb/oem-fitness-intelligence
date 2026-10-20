@@ -1,5 +1,6 @@
 // Exact presentation translations; collected text and product identities stay unchanged.
 const productTranslations: Record<string, string> = {
+  "XG-V12E Commercial Motorized Treadmill/Gym Equipment": "XG-V12E — esteira motorizada comercial / equipamento para academia",
   "Outer Thigh Abductor": "Abdutor de coxa",
   "Prone Leg Curl/Leg Extension": "Flexão de pernas em posição deitada / extensão de pernas",
   "Body Building Exercise Pin Selected Fitness Equipment Commercial Gym Equipment Strength Machine Chest Press": "Equipamento de musculação com seleção de carga por pino para academia comercial — máquina de supino",
@@ -60,11 +61,11 @@ export function translateProductText(value: string): string | null {
 export const vocabulary = {
   classes:{commercial:'Comercial',light_commercial:'Comercial leve'},
   applications:{gym:'Academia',studio:'Estúdio',condominium:'Condomínio',home:'Residencial',hotel:'Hotel',community:'Comunidade'},
-  fields:{max_weight_stack:'Carga máxima da torre',main_frame_gauge:'Tubulação da estrutura',loading_quantity:'Quantidade por contêiner',model:'Modelo',name:'Equipamento',brand:'Marca',age_group:'Faixa etária',gender:'Público',exercise_part:'Grupo muscular',material:'Material',declared_certifications:'Certificações',appliance:'Aplicações',application:'Aplicações',packing_dimensions:'Dimensões da embalagem',packing_type:'Embalagem',tube_size:'Tubulação',tube_thickness:'Espessura dos tubos',dimensions:'Dimensões',weight_stack:'Torre de pesos',micro_minor_adjustment:'Ajuste adicional',net_weight:'Peso líquido',gross_weight:'Peso bruto',max_user_weight:'Peso máximo do usuário',logo:'Personalização da marca',frame_color:'Cor da estrutura',cushion_color:'Cor do estofado',trade_mark:'Marca personalizada',transport_package:'Embalagem de transporte',origin:'Local de fabricação',hs_code:'Código aduaneiro',production_capacity:'Capacidade de produção',features:'Características',color:'Cores',price:'Preço',moq:'Pedido mínimo',payment_terms:'Pagamento',delivery_time:'Prazo de entrega',after_sales:'Pós-venda',faq_q5:'Planejamento do espaço',faq_q6:'Montagem'},
+  fields:{motor:'Motor',console:'Painel',peak_power:'Potência de pico',folding:'Estrutura dobrável',speed_range:'Faixa de velocidade',incline_range:'Inclinação e declive',type:'Tipo de equipamento',max_weight_stack:'Carga máxima da torre',main_frame_gauge:'Tubulação da estrutura',loading_quantity:'Quantidade por contêiner',model:'Modelo',name:'Equipamento',brand:'Marca',age_group:'Faixa etária',gender:'Público',exercise_part:'Grupo muscular',material:'Material',declared_certifications:'Certificações',appliance:'Aplicações',application:'Aplicações',packing_dimensions:'Dimensões da embalagem',packing_type:'Embalagem',tube_size:'Tubulação',tube_thickness:'Espessura dos tubos',dimensions:'Dimensões',weight_stack:'Torre de pesos',micro_minor_adjustment:'Ajuste adicional',net_weight:'Peso líquido',gross_weight:'Peso bruto',max_user_weight:'Peso máximo do usuário',logo:'Personalização da marca',frame_color:'Cor da estrutura',cushion_color:'Cor do estofado',trade_mark:'Marca personalizada',transport_package:'Embalagem de transporte',origin:'Local de fabricação',hs_code:'Código aduaneiro',production_capacity:'Capacidade de produção',features:'Características',color:'Cores',price:'Preço',moq:'Pedido mínimo',payment_terms:'Pagamento',delivery_time:'Prazo de entrega',after_sales:'Pós-venda',faq_q5:'Planejamento do espaço',faq_q6:'Montagem'},
   terms:{MOQ:{label:'Pedido mínimo',meaning:'Quantidade mínima aceita por pedido. Não representa a capacidade mínima de fabricação.'},'T/T':{label:'Transferência bancária',meaning:'Pagamento por transferência bancária.'},'L/C':{label:'Carta de crédito',meaning:'Pagamento por carta de crédito; preservar a condição à vista quando informada.'},SKU:{label:'Modelo',meaning:'Identificador comercial do equipamento.'},packing_size:{label:'Dimensões da embalagem',meaning:'Medidas do equipamento acondicionado para transporte.'}}
 } as const;
 export function capitalize(value:string){return value?value[0].toLocaleUpperCase('pt-BR')+value.slice(1):value;}
-export function fieldLabel(field:string){return vocabulary.fields[field as keyof typeof vocabulary.fields]??'Informação complementar';}
+export function fieldLabel(field:string){const box=field.match(/^packing_box_(\d+)$/);if(box)return 'Dimensões da caixa '+box[1];return vocabulary.fields[field as keyof typeof vocabulary.fields]??'Informação complementar';}
 export function classLabel(value:string|null){return vocabulary.classes[value as keyof typeof vocabulary.classes]??'Classe não informada';}
 export function applicationLabel(value:string){return vocabulary.applications[value as keyof typeof vocabulary.applications]??'Aplicação não informada';}
 
@@ -98,6 +99,16 @@ const translations:Record<string,string>={
 // Product presentation is deliberately separate from collected evidence.
 // Unsupported wording is omitted instead of leaking untranslated text or inventing a value.
 export function displayValue(field:string,raw:string):string|null {
+ if(/^packing_box_\d+$/.test(field)&&/^\d+ × \d+ × \d+ mm$/.test(raw))return raw;
+ if(field==='type'&&raw==='Treadmill')return 'Esteira';
+ if(field==='motor'){const m=raw.match(/^(\d+(?:\.\d+)?) HP AC Motor$/);if(m)return 'Motor CA de '+m[1].replace('.',',')+' HP';}
+ if(field==='peak_power'&&/^\d+(?:\.\d+)? HP$/.test(raw))return raw.replace('.',',');
+ if(field==='console'&&raw==='LED display monitor with USB charging,FAN, etc.')return 'Monitor LED com carregamento USB, ventilador etc.';
+ if(field==='folding'&&raw==='Unfolding')return 'Não dobrável';
+ if(field==='speed_range'&&/^\d+(?:\.\d+)?-\d+(?:\.\d+)? km\/h$/.test(raw))return raw.replaceAll('.',',').replace('-','–');
+ if(field==='incline_range'){const m=raw.match(/^decline(\d+(?:\.\d+)?)%-(\d+(?:\.\d+)?)% incline by motor$/);if(m)return 'Declive de '+m[1].replace('.',',')+'% a inclinação de '+m[2].replace('.',',')+'%, motorizada';}
+ if(field==='origin'&&raw==='Zhejiang, China')return raw;
+
  if(field==='name'){const translated=translateProductText(raw);if(translated)return translated;}
  if(translations[raw])return translations[raw];
  if(field==='net_weight'&&/including/i.test(raw)){const m=raw.match(/^(\d+)\s*kg\s*\(including\s*(\d+)\s*kg\s*weight stacks\)/i);if(m)return m[1]+' kg (inclui torre de pesos de '+m[2]+' kg)';}
