@@ -139,7 +139,7 @@ export function parsePage(html, url) {
     }
   });
 
-  const product = blocks
+  let product = blocks
     .flatMap(graph)
     .find(x =>
       []
@@ -155,9 +155,18 @@ export function parsePage(html, url) {
 
   if (/\/product\//.test(source.pathname) || /^\/co_[a-z0-9-]+\/product_(?!group_).+\.html$/i.test(source.pathname)) {
     if (!product || !clean(product.name)) {
-      throw new Error(
-        'Anúncio sem Product JSON-LD válido; revisão necessária.'
-      );
+      const declaredUrl = $('link[rel="canonical"]').attr('href');
+      const declaredTitle = clean($('h1').first().text());
+      const domExtraction = extractProduct(html, url);
+      let sameSource = false;
+      try { sameSource = canonicalUrl(declaredUrl, url) === canonicalUrl(url); } catch { /* Invalid source remains rejected. */ }
+      if (!declaredUrl || !sameSource || $('meta[property="og:type"]').attr('content') !== 'product' ||
+          !declaredTitle || !domExtraction.product.model || !domExtraction.supplier.name ||
+          domExtraction.conflicts.some(conflict => conflict.field === 'model')) {
+        throw new Error('Anúncio sem Product JSON-LD válido; revisão necessária.');
+      }
+      // DOM-backed internal representation; never add a synthetic JSON-LD block.
+      product = {name: declaredTitle};
     }
 
     const attrs = {};
