@@ -1,5 +1,8 @@
 // Exact presentation translations; collected text and product identities stay unchanged.
 const productTranslations: Record<string, string> = {
+  "INCLINE CHEST PRESS": "Supino inclinado",
+  "Incline Chest Press": "Supino inclinado",
+  "Commercial Gym Fitness Strength Equipment Incline Chest Press": "Equipamento de musculação comercial para academia — supino inclinado",
   "XG-V12E Commercial Motorized Treadmill/Gym Equipment": "XG-V12E — esteira motorizada comercial / equipamento para academia",
   "Outer Thigh Abductor": "Abdutor de coxa",
   "Prone Leg Curl/Leg Extension": "Flexão de pernas em posição deitada / extensão de pernas",
